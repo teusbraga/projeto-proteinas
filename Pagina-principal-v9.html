@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabela de Proteínas</title>
+    <style>
+        /* Configuração geral para responsividade */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Responsividade para centralizar a tabela em desktops e preencher em mobile */
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #f4f4f4;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:nth-child(odd) {
+            background-color: #ffffff;
+        }
+
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Dropdown menu */
+        .dropdown {
+            display: inline-block;
+            position: relative;
+        }
+
+        .dropdown button {
+            background-color: #007bff;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: white;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+            z-index: 1;
+        }
+
+        .dropdown-content button {
+            background-color: white;
+            color: black;
+            padding: 10px;
+            text-align: left;
+            width: 100%;
+            border: none;
+        }
+
+        .dropdown-content button:hover {
+            background-color: #f1f1f1;
+        }
+
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
+
+        /* Garantir layout fluido em dispositivos móveis */
+        @media (max-width: 768px) {
+            .container {
+                width: 100%;
+                padding: 5px;
+            }
+
+            table {
+                font-size: 14px;
+            }
+
+            button {
+                font-size: 14px;
+            }
+        }
+
+        /* Centralizar conteúdo em desktops */
+        @media (min-width: 769px) {
+            .container {
+                width: 33%;
+            }
+        }
+
+        .reset-link {
+            color: blue;
+            text-decoration: underline;
+            cursor: pointer;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .reset-link:hover {
+            color: darkblue;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="text-align: center;">Calculadora de Proteínas</h1>
+
+        <!-- Formulário -->
+        <form id="formulario">
+            <label for="nomeProduto">Nome do Produto:</label>
+            <input type="text" id="nomeProduto" placeholder="Ex: Peito de Frango" required style="width: 100%; padding: 5px; margin-bottom: 10px;">
+
+            <label for="precoTotal">Preço Total (R$):</label>
+            <input type="number" id="precoTotal" placeholder="Preço total (R$)" required step="0.01" style="width: 100%; padding: 5px; margin-bottom: 10px;">
+
+            <label for="pesoTotal">Peso Total (g):</label>
+            <input type="number" id="pesoTotal" placeholder="Peso total (g)" required step="0.01" style="width: 100%; padding: 5px; margin-bottom: 10px;">
+
+            <label for="pesoPorcao">Peso da Porção (g):</label>
+            <input type="number" id="pesoPorcao" placeholder="Peso da porção (g)" required step="0.01" style="width: 100%; padding: 5px; margin-bottom: 10px;">
+
+            <label for="proteinaPorPorcao">Proteína por Porção (g):</label>
+            <input type="number" id="proteinaPorPorcao" placeholder="Proteína por porção (g)" required step="0.01" style="width: 100%; padding: 5px; margin-bottom: 10px;">
+
+            <div style="color: red; font-size: 0.9em; margin-bottom: 10px;" id="erro"></div>
+
+            <button type="submit" style="width: 100%;">Adicionar</button>
+        </form>
+
+        <!-- Dropdown menu -->
+        <div class="dropdown" style="margin: 10px 0;">
+            <button>Ordenar</button>
+            <div class="dropdown-content">
+                <button id="ordenarEntrada">Ordenar por Entrada</button>
+                <button id="ordenarPrecoCrescente">Preço por Proteína (Crescente)</button>
+                <button id="ordenarPrecoDecrescente">Preço por Proteína (Decrescente)</button>
+            </div>
+        </div>
+
+        <!-- Tabela -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome do Produto</th>
+                    <th>Preço Total (R$)</th>
+                    <th>Peso Total (g)</th>
+                    <th>Peso Porção (g)</th>
+                    <th>Proteína Porção (g)</th>
+                    <th>Valor/G (R$)</th>
+                    <th>Remover</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaCorpo"></tbody>
+        </table>
+
+        <!-- Botões adicionais -->
+        <div style="text-align: center; margin: 20px 0;">
+            <button id="exportarJson">Exportar JSON</button>
+            <button id="exportarTxt">Exportar TXT</button>
+        </div>
+
+        <div class="reset-link" id="resetar">Resetar</div>
+    </div>
+
+    <script>
+        "use strict";
+
+        const tabelaItens = JSON.parse(localStorage.getItem('tabelaItens')) || [];
+
+        function salvarLocal() {
+            try {
+                localStorage.setItem('tabelaItens', JSON.stringify(tabelaItens));
+            } catch (e) {
+                console.error('Erro ao salvar no localStorage:', e);
+            }
+        }
+
+        function calcularValorPorGramaProteina(precoTotal, pesoTotal, pesoPorcao, proteinaPorPorcao) {
+            const precoPorGrama = precoTotal / pesoTotal;
+            const custoPorcao = precoPorGrama * pesoPorcao;
+            return custoPorcao / proteinaPorPorcao;
+        }
+
+        function atualizarTabela() {
+            const tabelaCorpo = document.getElementById('tabelaCorpo');
+            tabelaCorpo.innerHTML = '';
+            tabelaItens.forEach((item, index) => {
+                const linha = document.createElement('tr');
+                linha.innerHTML = `
+                    <td>${item.nomeProduto}</td>
+                    <td>${item.precoTotal.toFixed(2)}</td>
+                    <td>${item.pesoTotal.toFixed(2)}</td>
+                    <td>${item.pesoPorcao.toFixed(2)}</td>
+                    <td>${item.proteinaPorPorcao.toFixed(2)}</td>
+                    <td>${item.valorPorGramaProteina.toFixed(4)}</td>
+                    <td><button class="eliminar" data-index="${index}">X</button></td>
+                `;
+                tabelaCorpo.appendChild(linha);
+            });
+        }
+
+        document.getElementById('formulario').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const nomeProduto = document.getElementById('nomeProduto').value;
+            const precoTotal = parseFloat(document.getElementById('precoTotal').value);
+            const pesoTotal = parseFloat(document.getElementById('pesoTotal').value);
+            const pesoPorcao = parseFloat(document.getElementById('pesoPorcao').value);
+            const proteinaPorPorcao = parseFloat(document.getElementById('proteinaPorPorcao').value);
+
+            if (![precoTotal, pesoTotal, pesoPorcao, proteinaPorPorcao].every(campo => campo > 0)) {
+                document.getElementById('erro').textContent = 'Preencha todos os campos com valores maiores que zero!';
+                return;
+            }
+
+            document.getElementById('erro').textContent = '';
+
+            const valorPorGramaProteina = calcularValorPorGramaProteina(precoTotal, pesoTotal, pesoPorcao, proteinaPorPorcao);
+
+            tabelaItens.push({ 
+                nomeProduto, 
+                precoTotal, 
+                pesoTotal, 
+                pesoPorcao, 
+                proteinaPorPorcao, 
+                valorPorGramaProteina,
+                dataEntrada: Date.now()
+            });
+
+            salvarLocal();
+            atualizarTabela();
+        });
+
+        document.getElementById('resetar').addEventListener('click', function() {
+            tabelaItens.length = 0;
+            salvarLocal();
+            atualizarTabela();
+        });
+
+        document.getElementById('tabelaCorpo').addEventListener('click', function(e) {
+            if (e.target && e.target.classList.contains('eliminar')) {
+                const index = e.target.getAttribute('data-index');
+                tabelaItens.splice(index, 1);
+                salvarLocal();
+                atualizarTabela();
+            }
+        });
+
+        function ordenarTabela(criterio) {
+            if (criterio === 'entrada') {
+                tabelaItens.sort((a, b) => a.dataEntrada - b.dataEntrada);
+            } else if (criterio === 'precoCrescente') {
+                tabelaItens.sort((a, b) => a.valorPorGramaProteina - b.valorPorGramaProteina);
+            } else if (criterio === 'precoDecrescente') {
+                tabelaItens.sort((a, b) => b.valorPorGramaProteina - a.valorPorGramaProteina);
+            }
+            atualizarTabela();
+        }
+
+        document.getElementById('ordenarEntrada').addEventListener('click', function() {
+            ordenarTabela('entrada');
+        });
+
+        document.getElementById('ordenarPrecoCrescente').addEventListener('click', function() {
+            ordenarTabela('precoCrescente');
+        });
+
+        document.getElementById('ordenarPrecoDecrescente').addEventListener('click', function() {
+            ordenarTabela('precoDecrescente');
+        });
+
+        atualizarTabela();
+    </script>
+</body>
+</html>
