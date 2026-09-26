@@ -143,7 +143,7 @@ export async function getStats() {
       .eq('is_active', true)
       .order('price_per_g_protein', { ascending: true })
       .limit(1)
-      .single(),
+      .maybeSingle(),
   ])
 
   return {
