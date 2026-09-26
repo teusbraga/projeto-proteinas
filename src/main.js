@@ -16,7 +16,6 @@ import { calcularPrecoPorGrama, formatarPreco, validarCampos } from './calculato
 import { saveProduct, getMyProducts, getRanking, deleteProduct, getStats, subscribeRanking } from './products.js'
 import { openMapModal, closeMapModal, resetMapModal } from './ui/modal.js'
 import { showToast } from './ui/toast.js'
-import { getSelectedLocation } from './map.js'
 
 // ============================================================
 // ESTADO GLOBAL DA APLICAÇÃO

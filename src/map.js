@@ -1,13 +1,16 @@
-import mapboxgl from 'mapbox-gl'
-import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
 
 const TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
-/** @type {mapboxgl.Map|null} */
+/** @type {any} */
+let mapboxglModule = null
+/** @type {any} */
+let MapboxGeocoderModule = null
+
+/** @type {any} */
 let map = null
-/** @type {mapboxgl.Marker|null} */
+/** @type {any} */
 let marker = null
 /** @type {{ lat: number, lng: number, placeName: string }|null} */
 let selectedLocation = null
@@ -29,13 +32,13 @@ export function resetLocation() {
 }
 
 /**
- * Inicializa o mapa dentro do elemento #map.
- * Deve ser chamado APÓS o modal estar visível no DOM.
+ * Inicializa o mapa dentro do elemento #map via dynamic import.
+ * Carrega mapbox-gl e geocoder sob demanda para não pesar o bundle inicial.
  *
  * @param {string} mapContainerId      - ID do elemento do mapa
  * @param {string} geocoderContainerId - ID do elemento para o geocoder
  */
-export function initMap(mapContainerId, geocoderContainerId) {
+export async function initMap(mapContainerId, geocoderContainerId) {
   if (!TOKEN) {
     console.warn('[Map] VITE_MAPBOX_TOKEN não configurado. Mapa desabilitado.')
     document.getElementById(mapContainerId).innerHTML = `
@@ -45,6 +48,19 @@ export function initMap(mapContainerId, geocoderContainerId) {
       </div>`
     return
   }
+
+  // Carrega bibliotecas pesadas de mapa apenas quando o modal for aberto
+  if (!mapboxglModule || !MapboxGeocoderModule) {
+    const [mbModule, geoModule] = await Promise.all([
+      import('mapbox-gl'),
+      import('@mapbox/mapbox-gl-geocoder')
+    ])
+    mapboxglModule = mbModule.default || mbModule
+    MapboxGeocoderModule = geoModule.default || geoModule
+  }
+
+  const mapboxgl = mapboxglModule
+  const MapboxGeocoder = MapboxGeocoderModule
 
   mapboxgl.accessToken = TOKEN
 
@@ -110,9 +126,12 @@ function setMarker(lng, lat, placeName) {
   // Remove marcador anterior
   marker?.remove()
 
-  marker = new mapboxgl.Marker({ color: '#22c55e', scale: 1.1 })
-    .setLngLat([lng, lat])
-    .addTo(map)
+  const MarkerClass = mapboxglModule?.Marker || window.mapboxgl?.Marker
+  if (MarkerClass && map) {
+    marker = new MarkerClass({ color: '#22c55e', scale: 1.1 })
+      .setLngLat([lng, lat])
+      .addTo(map)
+  }
 
   selectedLocation = { lng, lat, placeName }
 
