@@ -66,12 +66,31 @@ export async function initGlobalMap(containerId, pins = []) {
     container: containerId,
     style: 'mapbox://styles/mapbox/light-v11', // Tema claro alinhado à nova paleta
     center: initialCenter,
-    zoom: firstValid ? 12 : 4,
+    zoom: firstValid ? 11 : 4,
     cooperativeGestures: true, // melhora scroll em celulares
   })
 
   // Adiciona controles de navegação
   globalMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
+
+  // Alterna exibição: pontos compactos quando afastado, preços detalhados quando aproxima
+  const ZOOM_PRICE_THRESHOLD = 11.5
+
+  const updateZoomDisplay = () => {
+    if (!globalMap || !container) return
+    const currentZoom = globalMap.getZoom()
+    if (currentZoom >= ZOOM_PRICE_THRESHOLD) {
+      container.classList.add('map-show-prices')
+      container.classList.remove('map-compact-dots')
+    } else {
+      container.classList.add('map-compact-dots')
+      container.classList.remove('map-show-prices')
+    }
+  }
+
+  globalMap.on('zoom', updateZoomDisplay)
+  globalMap.on('load', updateZoomDisplay)
+  updateZoomDisplay()
 
   // Plota os pins personalizados com preços
   pins.forEach(pin => {

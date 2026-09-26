@@ -1046,6 +1046,94 @@ body::before {
   border: 1px solid rgba(22, 163, 74, 0.2);
 }
 
+/* === COMPORTAMENTO RESPONSIVO AO ZOOM DO MAPA === */
+
+/* 1. Modo Afastado (Zoom distante): pontos compactos limpos sem poluir o mapa */
+.map-compact-dots .map-pin-pill .pin-pill-content {
+  padding: 0;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  gap: 0;
+  justify-content: center;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.map-compact-dots .map-pin-pill .pin-price-text {
+  display: none;
+}
+
+.map-compact-dots .map-pin-pill .pin-pill-tail {
+  display: none;
+}
+
+/* O campeão dourado no modo compacto ganha destaque circular com coroa */
+.map-compact-dots .map-pin-pill.pin-cheapest .pin-pill-content {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 14px rgba(245, 158, 11, 0.65);
+}
+
+.map-compact-dots .map-pin-pill.pin-cheapest .pin-crown {
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+/* Interação no modo compacto: ao passar mouse ou tocar, expande o preço temporariamente */
+.map-compact-dots .map-pin-pill:hover .pin-pill-content,
+.map-compact-dots .map-pin-pill:active .pin-pill-content {
+  width: auto;
+  min-width: auto;
+  height: auto;
+  border-radius: 50px;
+  padding: 5px 11px;
+  background: var(--primary);
+  color: #ffffff;
+  gap: 5px;
+}
+
+.map-compact-dots .map-pin-pill:hover .pin-price-text,
+.map-compact-dots .map-pin-pill:active .pin-price-text {
+  display: inline;
+}
+
+.map-compact-dots .map-pin-pill:hover .pin-pill-tail,
+.map-compact-dots .map-pin-pill:active .pin-pill-tail {
+  display: block;
+}
+
+.map-compact-dots .map-pin-pill.pin-cheapest:hover .pin-pill-content,
+.map-compact-dots .map-pin-pill.pin-cheapest:active .pin-pill-content {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+}
+
+/* 2. Modo Aproximado (Zoom in): transição fluida para as pílulas de preço abertas */
+.map-show-prices .map-pin-pill .pin-pill-content {
+  animation: pill-expand 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pill-expand {
+  from {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* === MODAL DO MAPA === */
 .modal-overlay {
   position: fixed;
