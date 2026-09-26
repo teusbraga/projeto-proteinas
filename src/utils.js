@@ -81,3 +81,22 @@ export function calculateDistanceKm(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return R * c
 }
+
+/**
+ * Normaliza e extrai o nome base da cidade (remove sufixos como ", SP", "- SP", etc.)
+ * @param {string} inputStr
+ * @returns {string}
+ */
+export function cleanCityName(inputStr) {
+  if (!inputStr || typeof inputStr !== 'string') return ''
+  let str = inputStr.trim()
+  if (str.toLowerCase() === 'all') return 'all'
+  if (str.includes(',')) {
+    str = str.split(',')[0].trim()
+  } else if (str.includes(' - ')) {
+    str = str.split(' - ')[0].trim()
+  } else if (str.includes('/')) {
+    str = str.split('/')[0].trim()
+  }
+  return str
+}

@@ -17,7 +17,7 @@ import { saveProduct, getMyProducts, getRanking, getLatestPins, deleteProduct, g
 import { openMapModal, closeMapModal, resetMapModal } from './ui/modal.js'
 import { showToast } from './ui/toast.js'
 import { renderRankingList, renderPersonalRankingList, renderMyProductsList } from './ui/ranking.js'
-import { compressImage, escapeHtml, googleIcon, calculateDistanceKm } from './utils.js'
+import { compressImage, escapeHtml, googleIcon, calculateDistanceKm, cleanCityName } from './utils.js'
 import { initGlobalMap } from './map.js'
 import { getLocalProducts, saveLocalProduct, deleteLocalProduct, clearLocalProducts } from './localRanking.js'
 
@@ -683,10 +683,10 @@ async function loadStats(currency = state.currency) {
 // MAPA GLOBAL (Últimos 100 pins)
 // ============================================================
 
-async function loadGlobalMap() {
+async function loadGlobalMap(city = state.city, coords = null) {
   try {
-    const pins = await getLatestPins(100)
-    await initGlobalMap('global-map-container', pins)
+    const pins = await getLatestPins(100, city)
+    await initGlobalMap('global-map-container', pins, coords)
   } catch (err) {
     console.warn('[GlobalMap] Erro ao carregar pins:', err)
   }
@@ -784,7 +784,12 @@ async function loadPersonalRanking() {
 
   // Filtra por cidade
   if (state.city && state.city !== 'all') {
-    allPersonal = allPersonal.filter(p => p.city && p.city.toLowerCase().includes(state.city.toLowerCase()))
+    const clean = cleanCityName(state.city).toLowerCase()
+    allPersonal = allPersonal.filter(p => {
+      const pCity = (p.city || '').toLowerCase()
+      const pStore = (p.store_name || '').toLowerCase()
+      return pCity.includes(clean) || pStore.includes(clean)
+    })
   }
 
   // Filtra por proximidade (se GPS ativo)
@@ -1101,6 +1106,7 @@ function setupCityAutocomplete() {
     clearBtn.classList.add('hidden')
     hideSuggestions()
     reloadActiveRanking()
+    loadGlobalMap('all')
   })
 
   input.addEventListener('input', () => {
@@ -1113,6 +1119,7 @@ function setupCityAutocomplete() {
       clearBtn?.classList.add('hidden')
       state.city = 'all'
       reloadActiveRanking()
+      loadGlobalMap('all')
       hideSuggestions()
       return
     }
@@ -1154,7 +1161,17 @@ function setupCityAutocomplete() {
       items[idx]?.scrollIntoView({ block: 'nearest' })
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      if (active) active.click()
+      if (active) {
+        active.click()
+      } else {
+        const query = input.value.trim()
+        if (query) {
+          state.city = cleanCityName(query)
+          hideSuggestions()
+          reloadActiveRanking()
+          loadGlobalMap(state.city)
+        }
+      }
     } else if (e.key === 'Escape') {
       hideSuggestions()
     }
@@ -1173,13 +1190,27 @@ function setupCityAutocomplete() {
       li.textContent = feature.place_name
       li.dataset.placeName = feature.place_name
       li.addEventListener('click', () => {
-        // Extrai o nome principal da cidade (antes da vírgula)
-        const cityName = feature.text || feature.place_name.split(',')[0].trim()
+        // Encontra o município real a partir do context ou do próprio feature se for place
+        let cityName = ''
+        if (feature.id && feature.id.startsWith('place.')) {
+          cityName = feature.text
+        } else if (feature.context) {
+          const placeCtx = feature.context.find(c => c.id.startsWith('place.') || c.id.startsWith('municipality.'))
+          cityName = placeCtx?.text || feature.text
+        } else {
+          cityName = feature.text || feature.place_name.split(',')[0].trim()
+        }
+
+        const clean = cleanCityName(cityName)
         input.value = feature.place_name
-        state.city = cityName
+        state.city = clean
         hideSuggestions()
         clearBtn?.classList.remove('hidden')
         reloadActiveRanking()
+
+        // Sincroniza o mapa com as coordenadas da cidade selecionada
+        const coords = feature.center // [lng, lat]
+        loadGlobalMap(state.city, coords)
       })
       suggestionsList.appendChild(li)
     })

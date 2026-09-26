@@ -22,14 +22,17 @@ let selectedLocation = null
 
 /** @type {any} */
 let globalMap = null
+/** @type {Array<any>} */
+let globalMapMarkers = []
 
 /**
- * Inicializa o mapa global na página inicial com os últimos alfinetes.
+ * Inicializa ou atualiza o mapa global na página inicial com os últimos alfinetes.
  *
  * @param {string} containerId - ID do elemento do mapa global
  * @param {Array<Object>} pins - Lista dos últimos pins
+ * @param {Array<number>|null} [targetCoords] - [lng, lat] opcionais para centralizar o mapa
  */
-export async function initGlobalMap(containerId, pins = []) {
+export async function initGlobalMap(containerId, pins = [], targetCoords = null) {
   if (!TOKEN) return null
 
   if (!mapboxglModule) {
@@ -43,11 +46,6 @@ export async function initGlobalMap(containerId, pins = []) {
   const container = document.getElementById(containerId)
   if (!container) return null
 
-  if (globalMap) {
-    globalMap.remove()
-    globalMap = null
-  }
-
   // Identifica o menor preço para destacar o alfinete dourado (campeão do custo-benefício)
   const validPinsWithPrice = pins.filter(p => p.latitude && p.longitude && p.price_per_g != null && Number(p.price_per_g) > 0)
   const minPrice = validPinsWithPrice.length > 0
@@ -58,39 +56,48 @@ export async function initGlobalMap(containerId, pins = []) {
 
   // Centraliza no campeão de melhor preço ou no primeiro pin com coordenadas
   const firstValid = cheapestPin || pins.find(p => p.latitude && p.longitude)
-  const initialCenter = firstValid
-    ? [Number(firstValid.longitude), Number(firstValid.latitude)]
-    : [-46.6333, -23.5505]
 
-  globalMap = new mapboxgl.Map({
-    container: containerId,
-    style: 'mapbox://styles/mapbox/light-v11', // Tema claro alinhado à nova paleta
-    center: initialCenter,
-    zoom: firstValid ? 11 : 4,
-    cooperativeGestures: true, // melhora scroll em celulares
-  })
+  if (!globalMap) {
+    const initialCenter = targetCoords
+      ? targetCoords
+      : (firstValid
+          ? [Number(firstValid.longitude), Number(firstValid.latitude)]
+          : [-46.6333, -23.5505])
 
-  // Adiciona controles de navegação
-  globalMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
+    globalMap = new mapboxgl.Map({
+      container: containerId,
+      style: 'mapbox://styles/mapbox/light-v11', // Tema claro alinhado à nova paleta
+      center: initialCenter,
+      zoom: targetCoords ? 12 : (firstValid ? 11 : 4),
+      cooperativeGestures: true, // melhora scroll em celulares
+    })
 
-  // Alterna exibição: pontos compactos quando afastado, preços detalhados quando aproxima
-  const ZOOM_PRICE_THRESHOLD = 11.5
+    // Adiciona controles de navegação
+    globalMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
 
-  const updateZoomDisplay = () => {
-    if (!globalMap || !container) return
-    const currentZoom = globalMap.getZoom()
-    if (currentZoom >= ZOOM_PRICE_THRESHOLD) {
-      container.classList.add('map-show-prices')
-      container.classList.remove('map-compact-dots')
-    } else {
-      container.classList.add('map-compact-dots')
-      container.classList.remove('map-show-prices')
+    // Alterna exibição: pontos compactos quando afastado, preços detalhados quando aproxima
+    const ZOOM_PRICE_THRESHOLD = 11.5
+
+    const updateZoomDisplay = () => {
+      if (!globalMap || !container) return
+      const currentZoom = globalMap.getZoom()
+      if (currentZoom >= ZOOM_PRICE_THRESHOLD) {
+        container.classList.add('map-show-prices')
+        container.classList.remove('map-compact-dots')
+      } else {
+        container.classList.add('map-compact-dots')
+        container.classList.remove('map-show-prices')
+      }
     }
+
+    globalMap.on('zoom', updateZoomDisplay)
+    globalMap.on('load', updateZoomDisplay)
+    updateZoomDisplay()
   }
 
-  globalMap.on('zoom', updateZoomDisplay)
-  globalMap.on('load', updateZoomDisplay)
-  updateZoomDisplay()
+  // Limpa marcadores anteriores do mapa global
+  globalMapMarkers.forEach(m => m.remove())
+  globalMapMarkers = []
 
   // Plota os pins personalizados com preços
   pins.forEach(pin => {
@@ -134,11 +141,30 @@ export async function initGlobalMap(containerId, pins = []) {
     const popup = new mapboxgl.Popup({ offset: [0, -18], closeButton: true, maxWidth: '280px' })
       .setHTML(popupHtml)
 
-    new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+    const markerInstance = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
       .setLngLat([Number(pin.longitude), Number(pin.latitude)])
       .setPopup(popup)
       .addTo(globalMap)
+
+    globalMapMarkers.push(markerInstance)
   })
+
+  // Se houver coordenadas alvo (cidade selecionada no autocomplete ou flyTo), voa suavemente
+  if (targetCoords && Array.isArray(targetCoords) && targetCoords.length === 2) {
+    globalMap.flyTo({
+      center: [Number(targetCoords[0]), Number(targetCoords[1])],
+      zoom: 12,
+      essential: true,
+      speed: 1.2
+    })
+  } else if (cheapestPin) {
+    globalMap.flyTo({
+      center: [Number(cheapestPin.longitude), Number(cheapestPin.latitude)],
+      zoom: 11.5,
+      essential: true,
+      speed: 1.2
+    })
+  }
 
   return globalMap
 }
@@ -226,6 +252,9 @@ export async function initMap(mapContainerId, geocoderContainerId) {
       const placeCtx = e.result.context.find(c => c.id.startsWith('place.') || c.id.startsWith('municipality.'))
       city = placeCtx?.text || null
     }
+    if (!city && e.result.id && e.result.id.startsWith('place.')) {
+      city = e.result.text || null
+    }
     setMarker(lng, lat, e.result.place_name, city)
   })
 
@@ -286,6 +315,9 @@ async function reverseGeocode(lng, lat) {
     if (feature?.context) {
       const placeCtx = feature.context.find(c => c.id.startsWith('place.') || c.id.startsWith('municipality.'))
       city = placeCtx?.text || null
+    }
+    if (!city && feature?.id && feature.id.startsWith('place.')) {
+      city = feature.text || null
     }
 
     return { placeName, city }

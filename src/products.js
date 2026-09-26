@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js'
+import { cleanCityName } from './utils.js'
 
 // ============================================================
 // SAVE
@@ -150,7 +151,10 @@ export async function getRanking({ foodType = null, currency = 'BRL', city = nul
     }
 
     if (city && city !== 'all') {
-      query = query.ilike('city', `%${city.trim()}%`)
+      const clean = cleanCityName(city)
+      if (clean && clean !== 'all') {
+        query = query.ilike('city', `%${clean}%`)
+      }
     }
 
     if (includeCurrencyColumn && currency && currency !== 'all') {
@@ -207,25 +211,35 @@ export async function getAvailableCities() {
  * Busca os últimos 100 alfinetes/pontos geográficos no mapa global.
  * @returns {Promise<Array<Object>>}
  */
-export async function getLatestPins(limit = 100) {
-  let { data, error } = await supabase
-    .from('products')
-    .select('id, store_name, city, latitude, longitude, name, price_per_g_protein, currency, created_at')
-    .not('latitude', 'is', null)
-    .not('longitude', 'is', null)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(limit)
+export async function getLatestPins(limit = 100, city = null) {
+  const runQuery = async (includeCurrencyColumn = true) => {
+    const fields = includeCurrencyColumn
+      ? 'id, store_name, city, latitude, longitude, name, price_per_g_protein, currency, created_at'
+      : 'id, store_name, city, latitude, longitude, name, price_per_g_protein, created_at'
 
-  if (error && error.message && error.message.includes('currency')) {
-    const retry = await supabase
+    let query = supabase
       .from('products')
-      .select('id, store_name, city, latitude, longitude, name, price_per_g_protein, created_at')
+      .select(fields)
       .not('latitude', 'is', null)
       .not('longitude', 'is', null)
       .eq('is_active', true)
+
+    if (city && city !== 'all') {
+      const clean = cleanCityName(city)
+      if (clean && clean !== 'all') {
+        query = query.ilike('city', `%${clean}%`)
+      }
+    }
+
+    return await query
       .order('created_at', { ascending: false })
       .limit(limit)
+  }
+
+  let { data, error } = await runQuery(true)
+
+  if (error && error.message && error.message.includes('currency')) {
+    const retry = await runQuery(false)
     data = retry.data
     error = retry.error
   }
