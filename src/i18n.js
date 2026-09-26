@@ -357,14 +357,18 @@ export function onLanguageChange(callback) {
 function updateLanguageControls(lang) {
   const isEn = lang === 'en'
 
-  // Header Desktop
+  // Header Desktop (Bandeiras em CSS puro)
   const headerBtn = document.getElementById('btn-lang-toggle')
   if (headerBtn) {
     headerBtn.setAttribute('title', isEn ? 'Mudar para Português' : 'Switch to English')
     headerBtn.setAttribute('aria-label', isEn ? 'Mudar para Português' : 'Switch to English')
     const flag = headerBtn.querySelector('.lang-flag')
     const code = headerBtn.querySelector('.lang-code')
-    if (flag) flag.textContent = isEn ? '🇧🇷' : '🇺🇸'
+    if (flag) {
+      flag.innerHTML = isEn
+        ? '<span class="flag-css flag-br" aria-hidden="true"></span>'
+        : '<span class="flag-css flag-us" aria-hidden="true"></span>'
+    }
     if (code) code.textContent = isEn ? 'PT' : 'EN'
   }
 

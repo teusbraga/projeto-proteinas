@@ -34,16 +34,19 @@
 
       <nav class="header-nav">
         <button class="btn-ghost" id="btn-scroll-ranking" data-i18n="navRanking">🏆 Ranking</button>
-        <!-- Alternador de Tema Claro/Escuro -->
-        <button class="btn-icon" id="btn-theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">
-          <span id="theme-toggle-icon">🌙</span>
-        </button>
-        <!-- Alternador de Idioma (PT / EN) -->
-        <button class="btn-lang" id="btn-lang-toggle" type="button" aria-label="Change language" title="Switch language">
-          <span class="lang-flag">🇺🇸</span> <span class="lang-code">EN</span>
-        </button>
         <div id="auth-widget">
           <!-- Preenchido pelo JS no Desktop -->
+        </div>
+
+        <!-- Ferramentas Desktop: Tema e Idioma (discretos e colados à direita) -->
+        <div class="header-tools" id="header-tools">
+          <button class="btn-tool-subtle btn-theme-subtle" id="btn-theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">
+            <span id="theme-toggle-icon">🌙</span>
+          </button>
+          <button class="btn-tool-subtle btn-lang-subtle" id="btn-lang-toggle" type="button" aria-label="Change language" title="Switch language">
+            <span class="lang-flag"><span class="flag-css flag-us" aria-hidden="true"></span></span>
+            <span class="lang-code">EN</span>
+          </button>
         </div>
       </nav>
       <!-- Atalho no mobile (avatar ou login) -->

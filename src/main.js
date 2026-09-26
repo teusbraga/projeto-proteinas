@@ -129,7 +129,9 @@ function renderAuthWidget(user) {
     if (widget) {
       widget.innerHTML = `
         <div class="user-widget">
-          ${avatar ? `<img class="avatar-img" src="${avatar}" alt="Avatar de ${firstName}" referrerpolicy="no-referrer">` : ''}
+          ${avatar
+            ? `<img class="avatar-img" src="${avatar}" alt="Avatar de ${firstName}" referrerpolicy="no-referrer">`
+            : `<div class="avatar-placeholder">${firstName[0]}</div>`}
           <span class="avatar-name">${firstName}</span>
           <button class="btn-ghost" id="btn-signout">${t('signOut')}</button>
         </div>

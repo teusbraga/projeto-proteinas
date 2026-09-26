@@ -12,6 +12,7 @@
   --surface-3:    #f1f5f9;
   --border:       #e2e8f0;
   --border-hover: #cbd5e1;
+  --header-bg:    rgba(255, 255, 255, 0.88);
 
   /* Paleta Laranja / Salmão Vibrante */
   --primary:        #ff6b4a;
@@ -66,6 +67,7 @@
   --surface-3:    #243354;
   --border:       #1e293b;
   --border-hover: #334155;
+  --header-bg:    rgba(9, 13, 22, 0.88);
 
   /* Paleta Laranja / Salmão Vibrante adaptada */
   --primary:        #ff6b4a;
@@ -154,11 +156,12 @@ body::before {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--header-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .header-inner {
@@ -338,6 +341,146 @@ body::before {
   letter-spacing: 0.05em;
 }
 
+/* === HEADER TOOLS (Desktop: Discretos e colados à direita) === */
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+
+.btn-tool-subtle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-tool-subtle:hover {
+  background: var(--surface-2);
+  border-color: var(--border-hover);
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.btn-tool-subtle:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.btn-theme-subtle {
+  width: 32px;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.btn-lang-subtle {
+  padding: 0 8px;
+}
+
+.btn-lang-subtle .lang-flag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-lang-subtle .lang-code {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+
+.btn-lang-subtle:hover .lang-code {
+  color: var(--text);
+}
+
+/* === BANDEIRAS EM CSS PURO (Desktop) === */
+.flag-css {
+  display: inline-block;
+  width: 19px;
+  height: 13px;
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+[data-theme="dark"] .flag-css {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Bandeira do Brasil em CSS Puro */
+.flag-css.flag-br {
+  background-color: #009c3b;
+}
+
+.flag-css.flag-br::before {
+  content: '';
+  position: absolute;
+  top: 1.5px;
+  bottom: 1.5px;
+  left: 2px;
+  right: 2px;
+  background-color: #ffdf00;
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+.flag-css.flag-br::after {
+  content: '';
+  position: absolute;
+  width: 6.5px;
+  height: 6.5px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 45% 115%, #002776 52%, #ffffff 54%, #ffffff 68%, #002776 70%);
+}
+
+/* Bandeira dos EUA em CSS Puro */
+.flag-css.flag-us {
+  background: repeating-linear-gradient(
+    to bottom,
+    #b22234 0%,
+    #b22234 7.692%,
+    #ffffff 7.692%,
+    #ffffff 15.385%
+  );
+}
+
+.flag-css.flag-us::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 44%;
+  height: 54%;
+  background-color: #3c3b6e;
+  background-image:
+    radial-gradient(#ffffff 0.6px, transparent 0.7px),
+    radial-gradient(#ffffff 0.6px, transparent 0.7px);
+  background-size: 2.8px 2.4px;
+  background-position: 0.5px 0.5px, 1.9px 1.7px;
+}
+
 .btn-danger {
   background: var(--error-bg);
   border: 1px solid rgba(239, 68, 68, 0.2);
@@ -368,7 +511,24 @@ body::before {
   height: 36px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--primary);
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+  background: var(--primary-light);
+  color: var(--primary);
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  flex-shrink: 0;
 }
 
 .avatar-name {
@@ -1696,12 +1856,13 @@ body::before {
 }
 
 .drawer-avatar-wrap {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  border: 2px solid var(--primary-glow);
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
 }
 
 .drawer-avatar-img {
@@ -1915,7 +2076,8 @@ body::before {
 /* === TOP BAR MOBILE ATALHOS === */
 .btn-mobile-avatar {
   background: none;
-  border: 2px solid var(--primary-glow);
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
   padding: 0;
   border-radius: 50%;
   cursor: pointer;
@@ -1925,7 +2087,6 @@ body::before {
   width: 36px;
   height: 36px;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
 }
 
 .avatar-img-sm {
