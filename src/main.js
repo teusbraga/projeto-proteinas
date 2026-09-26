@@ -12,12 +12,12 @@
 
 import { supabase } from './supabase.js'
 import { signInWithGoogle, signOut, onAuthChange } from './auth.js'
-import { calcularPrecoPorGrama, formatarPreco, validarCampos } from './calculator.js'
-import { saveProduct, getMyProducts, getRanking, getLatestPins, deleteProduct, getStats, subscribeRanking } from './products.js'
+import { calcularPrecoPorGrama, formatarPreco, validarCampos, getCurrencySymbol } from './calculator.js'
+import { saveProduct, getMyProducts, getRanking, getLatestPins, deleteProduct, getStats, subscribeRanking, getAvailableCities } from './products.js'
 import { openMapModal, closeMapModal, resetMapModal } from './ui/modal.js'
 import { showToast } from './ui/toast.js'
 import { renderRankingList, renderPersonalRankingList, renderMyProductsList } from './ui/ranking.js'
-import { compressImage, escapeHtml, googleIcon } from './utils.js'
+import { compressImage, escapeHtml, googleIcon, calculateDistanceKm } from './utils.js'
 import { initGlobalMap } from './map.js'
 import { getLocalProducts, saveLocalProduct, deleteLocalProduct, clearLocalProducts } from './localRanking.js'
 
@@ -26,11 +26,16 @@ import { getLocalProducts, saveLocalProduct, deleteLocalProduct, clearLocalProdu
 // ============================================================
 
 const state = {
-  user:          null,    // User | null
-  activeTab:     'global',// 'global' | 'personal'
-  filter:        'all',   // 'all' | 'animal' | 'vegetal'
-  photoFile:     null,    // File | null
-  location:      null,    // { lat, lng, placeName, city } | null
+  user:            null,    // User | null
+  activeTab:       'global',// 'global' | 'personal'
+  filter:          'all',   // 'all' | 'animal' | 'vegetal'
+  currency:        'BRL',   // 'BRL' | 'USD' | 'EUR' | 'all'
+  city:            'all',   // 'all' | string
+  userCoords:      null,    // { lat, lng } | null
+  radiusKm:        25,      // raio padrão em km
+  proximityActive: false,   // boolean
+  photoFile:       null,    // File | null
+  location:        null,    // { lat, lng, placeName, city } | null
 }
 
 // ============================================================
@@ -248,9 +253,19 @@ function renderAddSection(user) {
           </select>
         </div>
 
+        <!-- Moeda -->
+        <div class="form-group">
+          <label for="f-currency">Moeda *</label>
+          <select id="f-currency" required>
+            <option value="BRL" selected>🇧🇷 Real Brasileiro (R$)</option>
+            <option value="USD">🇺🇸 Dólar Americano ($)</option>
+            <option value="EUR">🇪🇺 Euro (€)</option>
+          </select>
+        </div>
+
         <!-- Preço -->
         <div class="form-group">
-          <label for="f-price">Preço Total (R$) *</label>
+          <label for="f-price" id="lbl-price">Preço Total (R$) *</label>
           <input type="number" id="f-price" placeholder="Ex: 19.90" required step="0.01" min="0.01">
         </div>
 
@@ -323,6 +338,14 @@ function setupFormEvents() {
     document.getElementById(id)?.addEventListener('input', updateCalcPreview)
   })
 
+  // Mudança da moeda no formulário
+  document.getElementById('f-currency')?.addEventListener('change', (e) => {
+    const sym = getCurrencySymbol(e.target.value)
+    const lbl = document.getElementById('lbl-price')
+    if (lbl) lbl.textContent = `Preço Total (${sym}) *`
+    updateCalcPreview()
+  })
+
   // Upload de foto
   document.getElementById('f-photo')?.addEventListener('change', handlePhotoChange)
 
@@ -349,10 +372,11 @@ function setupFormEvents() {
 }
 
 function updateCalcPreview() {
-  const preco   = parseFloat(document.getElementById('f-price')?.value)
-  const peso    = parseFloat(document.getElementById('f-weight')?.value)
-  const porcao  = parseFloat(document.getElementById('f-portion')?.value)
+  const preco    = parseFloat(document.getElementById('f-price')?.value)
+  const peso     = parseFloat(document.getElementById('f-weight')?.value)
+  const porcao   = parseFloat(document.getElementById('f-portion')?.value)
   const proteina = parseFloat(document.getElementById('f-protein')?.value)
+  const currency = document.getElementById('f-currency')?.value || 'BRL'
 
   const wrapper = document.getElementById('calc-preview-wrapper')
   const valueEl = document.getElementById('calc-preview-value')
@@ -360,7 +384,7 @@ function updateCalcPreview() {
   if (wrapper && valueEl && [preco, peso, porcao, proteina].every(v => v > 0)) {
     wrapper.style.display = 'block'
     const result = calcularPrecoPorGrama(preco, peso, porcao, proteina)
-    valueEl.textContent = formatarPreco(result)
+    valueEl.textContent = formatarPreco(result, currency)
   } else if (wrapper) {
     wrapper.style.display = 'none'
   }
@@ -394,12 +418,13 @@ function handlePhotoChange(e) {
 async function handleFormSubmit(e) {
   e.preventDefault()
 
-  const name    = document.getElementById('f-name')?.value.trim()
-  const brand   = document.getElementById('f-brand')?.value.trim()
-  const type    = document.getElementById('f-type')?.value
-  const preco   = parseFloat(document.getElementById('f-price')?.value)
-  const peso    = parseFloat(document.getElementById('f-weight')?.value)
-  const porcao  = parseFloat(document.getElementById('f-portion')?.value)
+  const name     = document.getElementById('f-name')?.value.trim()
+  const brand    = document.getElementById('f-brand')?.value.trim()
+  const type     = document.getElementById('f-type')?.value
+  const currency = document.getElementById('f-currency')?.value || 'BRL'
+  const preco    = parseFloat(document.getElementById('f-price')?.value)
+  const peso     = parseFloat(document.getElementById('f-weight')?.value)
+  const porcao   = parseFloat(document.getElementById('f-portion')?.value)
   const proteina = parseFloat(document.getElementById('f-protein')?.value)
 
   // Validação
@@ -433,6 +458,7 @@ async function handleFormSubmit(e) {
         name,
         brand,
         food_type: type,
+        currency,
         price: preco,
         weight_g: peso,
         portion_g: porcao,
@@ -477,6 +503,7 @@ async function handleFormSubmit(e) {
       userId:    session.user.id,
       name,
       foodType:  type,
+      currency,
       brand:     brand || null,
       price:     preco,
       weightG:   peso,
@@ -492,8 +519,15 @@ async function handleFormSubmit(e) {
     showToast('Produto adicionado ao ranking global! 🎉', 'success')
     resetFormUI()
 
-    // Recarrega listas e mapas
-    await Promise.all([loadRanking(), loadMyProducts(), loadGlobalMap(), loadPersonalRanking()])
+    // Recarrega listas, mapa e atualiza cidades disponíveis
+    await Promise.all([
+      loadRanking(),
+      loadMyProducts(),
+      loadGlobalMap(),
+      loadPersonalRanking(),
+      refreshCityDropdown(),
+      loadStats(state.currency),
+    ])
 
     // Scroll suave para o ranking
     setTimeout(() => {
@@ -554,7 +588,24 @@ async function loadRanking() {
   `).join('')
 
   try {
-    const products = await getRanking({ foodType: state.filter })
+    let products = await getRanking({
+      foodType: state.filter,
+      currency: state.currency,
+      city: state.city,
+    })
+
+    // Se o filtro de proximidade estiver ativo, calcula a distância e filtra pelo raio
+    if (state.proximityActive && state.userCoords) {
+      products = products
+        .map(p => {
+          const dist = (p.latitude != null && p.longitude != null)
+            ? calculateDistanceKm(state.userCoords.lat, state.userCoords.lng, p.latitude, p.longitude)
+            : null
+          return { ...p, distance_km: dist }
+        })
+        .filter(p => p.distance_km != null && p.distance_km <= state.radiusKm)
+    }
+
     renderRankingList(container, products)
   } catch (err) {
     console.error('[Ranking]', err)
@@ -595,9 +646,9 @@ async function loadMyProducts() {
 // STATS (hero)
 // ============================================================
 
-async function loadStats() {
+async function loadStats(currency = state.currency) {
   try {
-    const stats = await getStats()
+    const stats = await getStats(currency)
     const el = document.getElementById('hero-stats')
     if (!el) return
 
@@ -612,9 +663,10 @@ async function loadStats() {
     }
 
     if (stats.cheapestPricePerG) {
+      const sym = getCurrencySymbol(stats.cheapestCurrency || currency || 'BRL')
       parts.push(`
         <div class="stat-item">
-          <div class="stat-value">R$ ${Number(stats.cheapestPricePerG).toFixed(4)}</div>
+          <div class="stat-value">${sym} ${Number(stats.cheapestPricePerG).toFixed(4)}</div>
           <div class="stat-label">Melhor preço/g proteína</div>
         </div>`)
     }
@@ -726,6 +778,28 @@ async function loadPersonalRanking() {
     allPersonal = allPersonal.filter(p => p.food_type === state.filter)
   }
 
+  // Filtra por moeda
+  if (state.currency && state.currency !== 'all') {
+    allPersonal = allPersonal.filter(p => (p.currency || 'BRL').toUpperCase() === state.currency.toUpperCase())
+  }
+
+  // Filtra por cidade
+  if (state.city && state.city !== 'all') {
+    allPersonal = allPersonal.filter(p => p.city && p.city.toLowerCase().includes(state.city.toLowerCase()))
+  }
+
+  // Filtra por proximidade (se GPS ativo)
+  if (state.proximityActive && state.userCoords) {
+    allPersonal = allPersonal
+      .map(p => {
+        const dist = (p.latitude != null && p.longitude != null)
+          ? calculateDistanceKm(state.userCoords.lat, state.userCoords.lng, p.latitude, p.longitude)
+          : null
+        return { ...p, distance_km: dist }
+      })
+      .filter(p => p.distance_km != null && p.distance_km <= state.radiusKm)
+  }
+
   renderPersonalRankingList(container, allPersonal, async (productId, photoUrl) => {
     if (productId.startsWith('local_')) {
       deleteLocalProduct(productId)
@@ -804,6 +878,7 @@ async function syncLocalToSupabase() {
           userId:    state.user.id,
           name:      item.name,
           foodType:  item.food_type,
+          currency:  item.currency || 'BRL',
           brand:     item.brand,
           price:     item.price,
           weightG:   item.weight_g,
@@ -905,17 +980,122 @@ function setupMobileFab() {
 // ============================================================
 
 function setupFilters() {
+  // Filtros de Tipo (Todos, Animal, Vegetal)
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
       btn.classList.add('active')
       state.filter = btn.getAttribute('data-filter')
-      if (state.activeTab === 'global') {
-        await loadRanking()
-      } else {
-        await loadPersonalRanking()
-      }
+      await reloadActiveRanking()
     })
+  })
+
+  // Filtro de Moeda (BRL, USD, EUR, all)
+  const currencySelect = document.getElementById('filter-currency')
+  currencySelect?.addEventListener('change', async (e) => {
+    state.currency = e.target.value
+    await Promise.all([reloadActiveRanking(), loadStats(state.currency)])
+  })
+
+  // Filtro de Cidade
+  const citySelect = document.getElementById('filter-city')
+  citySelect?.addEventListener('change', async (e) => {
+    state.city = e.target.value
+    await reloadActiveRanking()
+  })
+
+  // Filtro de Proximidade (Perto de mim)
+  const btnProximity = document.getElementById('btn-proximity')
+  const radiusSelect = document.getElementById('filter-radius')
+  const clearProximityBtn = document.getElementById('btn-clear-proximity')
+
+  btnProximity?.addEventListener('click', () => {
+    if (state.proximityActive) {
+      return
+    }
+
+    if (!navigator.geolocation) {
+      showToast('Geolocalização não é suportada pelo seu navegador.', 'error')
+      return
+    }
+
+    btnProximity.classList.add('loading')
+    const textSpan = btnProximity.querySelector('.proximity-text')
+    if (textSpan) textSpan.textContent = 'Obtendo GPS...'
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        state.userCoords = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        }
+        state.proximityActive = true
+
+        btnProximity.classList.remove('loading')
+        btnProximity.classList.add('active')
+        if (textSpan) textSpan.textContent = 'Perto de mim'
+        radiusSelect?.classList.remove('hidden')
+        clearProximityBtn?.classList.remove('hidden')
+
+        showToast(`📍 GPS ativo! Exibindo produtos até ${state.radiusKm} km.`, 'success')
+        await reloadActiveRanking()
+      },
+      (err) => {
+        btnProximity.classList.remove('loading')
+        if (textSpan) textSpan.textContent = 'Perto de mim'
+        console.warn('[Geolocation]', err)
+        showToast('Não foi possível obter sua localização. Permita o acesso ao GPS.', 'error')
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    )
+  })
+
+  // Mudança do Raio KM
+  radiusSelect?.addEventListener('change', async (e) => {
+    state.radiusKm = Number(e.target.value) || 25
+    if (state.proximityActive) {
+      showToast(`Raio atualizado para ${state.radiusKm} km.`, 'info')
+      await reloadActiveRanking()
+    }
+  })
+
+  // Desativar Proximidade
+  clearProximityBtn?.addEventListener('click', async () => {
+    state.proximityActive = false
+    state.userCoords = null
+    btnProximity?.classList.remove('active')
+    radiusSelect?.classList.add('hidden')
+    clearProximityBtn?.classList.add('hidden')
+    showToast('Filtro por proximidade desativado.', 'info')
+    await reloadActiveRanking()
+  })
+
+  // Inicializa lista de cidades no dropdown
+  refreshCityDropdown()
+}
+
+async function reloadActiveRanking() {
+  if (state.activeTab === 'global') {
+    await loadRanking()
+  } else {
+    await loadPersonalRanking()
+  }
+}
+
+async function refreshCityDropdown() {
+  const citySelect = document.getElementById('filter-city')
+  if (!citySelect) return
+
+  const currentVal = state.city
+  const cities = await getAvailableCities()
+
+  citySelect.innerHTML = '<option value="all">Todas as Cidades</option>'
+  cities.forEach(city => {
+    const opt = document.createElement('option')
+    opt.value = city
+    opt.textContent = city
+    if (city === currentVal) opt.selected = true
+    citySelect.appendChild(opt)
   })
 }
 

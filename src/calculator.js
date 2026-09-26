@@ -15,12 +15,28 @@ export function calcularPrecoPorGrama(precoTotal, pesoTotal, pesoPorcao, protein
 }
 
 /**
- * Formata o valor para exibição (4 casas decimais).
- * @param {number} valor
- * @returns {string} ex: "R$ 0,0342/g"
+ * Retorna o símbolo correspondente à moeda ISO.
+ * @param {string} [currency='BRL']
+ * @returns {string} ex: "R$", "$", "€"
  */
-export function formatarPreco(valor) {
-  return `R$ ${valor.toFixed(4)}/g`
+export function getCurrencySymbol(currency = 'BRL') {
+  const symbols = {
+    BRL: 'R$',
+    USD: '$',
+    EUR: '€',
+  }
+  return symbols[currency?.toUpperCase()] || 'R$'
+}
+
+/**
+ * Formata o valor para exibição (4 casas decimais) com a moeda adequada.
+ * @param {number} valor
+ * @param {string} [currency='BRL']
+ * @returns {string} ex: "R$ 0.0342/g" ou "$ 0.0342/g"
+ */
+export function formatarPreco(valor, currency = 'BRL') {
+  const symbol = getCurrencySymbol(currency)
+  return `${symbol} ${Number(valor).toFixed(4)}/g`
 }
 
 /**

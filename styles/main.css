@@ -636,6 +636,129 @@ body::before {
   color: #ffffff;
 }
 
+/* === TOOLBAR DE FILTROS AVANÇADOS (Moeda, Cidade, Proximidade KM) === */
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.filter-select {
+  padding: 7px 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.filter-select:hover {
+  border-color: var(--border-hover);
+  background: #ffffff;
+}
+
+.filter-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.filter-proximity-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.btn-proximity {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.btn-proximity:hover {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  background: var(--primary-light);
+}
+
+.btn-proximity.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 2px 8px var(--primary-glow);
+}
+
+.btn-proximity.loading {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.btn-clear-proximity {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  transition: all 0.15s ease;
+}
+
+.btn-clear-proximity:hover {
+  background: var(--error-bg);
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.badge-distance {
+  background: var(--info-bg);
+  color: var(--info);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+  font-weight: 700;
+  font-size: 0.74rem;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
 /* Banner de Sincronização LocalStorage */
 .sync-banner {
   display: flex;
@@ -1750,4 +1873,38 @@ body.drawer-open-lock {
   .modal-footer { flex-direction: column; align-items: stretch; }
   #toast-container { right: 12px; bottom: 12px; left: 12px; }
   .toast { min-width: 0; }
+
+  /* Filtros responsivos no mobile */
+  .filter-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .filter-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .filter-group .filter-select {
+    flex: 1;
+    max-width: 62%;
+  }
+
+  .filter-proximity-group {
+    margin-left: 0;
+    width: 100%;
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .btn-proximity {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .proximity-radius {
+    max-width: 45%;
+  }
 }

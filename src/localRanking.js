@@ -59,6 +59,7 @@ export function saveLocalProduct(productData) {
     city: productData.city?.trim() || null,
     latitude: productData.latitude ?? null,
     longitude: productData.longitude ?? null,
+    currency: productData.currency || 'BRL',
     created_at: new Date().toISOString(),
     is_local: true,
   }

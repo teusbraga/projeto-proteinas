@@ -1,4 +1,5 @@
 import { escapeHtml } from '../utils.js'
+import { getCurrencySymbol } from '../calculator.js'
 
 /**
  * Renderiza o ranking público de produtos no container especificado.
@@ -13,8 +14,8 @@ export function renderRankingList(container, products) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">🥗</div>
-        <div class="empty-state-title">Nenhum produto cadastrado ainda.</div>
-        <div class="empty-state-sub">Seja o primeiro a contribuir com a comunidade!</div>
+        <div class="empty-state-title">Nenhum produto encontrado.</div>
+        <div class="empty-state-sub">Tente alterar os filtros de cidade, distância ou moeda.</div>
       </div>`
     return
   }
@@ -42,6 +43,12 @@ export function renderRankingList(container, products) {
       ? `<span class="rank-location">📍 ${escapeHtml(locationText)}</span>`
       : ''
 
+    const distanceHtml = product.distance_km != null
+      ? `<span class="badge badge-distance">📏 ${product.distance_km < 1 ? `${Math.round(product.distance_km * 1000)} m` : `${product.distance_km.toFixed(1)} km`}</span>`
+      : ''
+
+    const symbol = getCurrencySymbol(product.currency || 'BRL')
+
     card.innerHTML = `
       <div class="rank-number ${rankClass}">${rankEl}</div>
       <div class="rank-photo">
@@ -57,11 +64,12 @@ export function renderRankingList(container, products) {
         </div>
         <div class="rank-meta">
           <span class="badge ${badgeClass}">${badgeLabel}</span>
+          ${distanceHtml}
           ${locationHtml}
         </div>
       </div>
       <div class="rank-price">
-        <div class="rank-price-value">R$ ${Number(product.price_per_g_protein).toFixed(4)}</div>
+        <div class="rank-price-value">${symbol} ${Number(product.price_per_g_protein).toFixed(4)}</div>
         <div class="rank-price-unit">por g de proteína</div>
       </div>
     `
@@ -120,6 +128,12 @@ export function renderPersonalRankingList(container, products, onDelete) {
       ? `<span class="badge badge-local">💾 Local (não sincronizado)</span>`
       : ''
 
+    const distanceHtml = product.distance_km != null
+      ? `<span class="badge badge-distance">📏 ${product.distance_km < 1 ? `${Math.round(product.distance_km * 1000)} m` : `${product.distance_km.toFixed(1)} km`}</span>`
+      : ''
+
+    const symbol = getCurrencySymbol(product.currency || 'BRL')
+
     card.innerHTML = `
       <div class="rank-number ${rankClass}">${rankEl}</div>
       <div class="rank-photo">
@@ -136,12 +150,13 @@ export function renderPersonalRankingList(container, products, onDelete) {
         <div class="rank-meta">
           <span class="badge ${badgeClass}">${badgeLabel}</span>
           ${isLocalTag}
+          ${distanceHtml}
           ${locationHtml}
         </div>
       </div>
       <div class="rank-price" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div>
-          <div class="rank-price-value">R$ ${Number(product.price_per_g_protein).toFixed(4)}</div>
+          <div class="rank-price-value">${symbol} ${Number(product.price_per_g_protein).toFixed(4)}</div>
           <div class="rank-price-unit">por g de proteína</div>
         </div>
         ${onDelete ? `
@@ -205,6 +220,8 @@ export function renderMyProductsList(container, products, onDelete) {
       ? (product.city ? `${product.store_name} (${product.city})` : product.store_name)
       : (product.city || '')
 
+    const symbol = getCurrencySymbol(product.currency || 'BRL')
+
     row.innerHTML = `
       <div>
         <div class="my-product-name">${escapeHtml(product.name)}</div>
@@ -213,7 +230,7 @@ export function renderMyProductsList(container, products, onDelete) {
           ${locationText ? `📍 ${escapeHtml(locationText)}` : ''}
         </div>
       </div>
-      <div class="my-product-price">R$ ${Number(product.price_per_g_protein).toFixed(4)}/g</div>
+      <div class="my-product-price">${symbol} ${Number(product.price_per_g_protein).toFixed(4)}/g</div>
       <button class="btn-danger btn-remove" data-id="${product.id}" aria-label="Remover ${escapeHtml(product.name)}">
         Remover
       </button>
