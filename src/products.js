@@ -19,11 +19,12 @@ import { supabase } from './supabase.js'
  * @param {number}  params.proteinG
  * @param {File}    [params.photoFile]
  * @param {string}  [params.storeName]
+ * @param {string}  [params.city]
  * @param {number}  [params.latitude]
  * @param {number}  [params.longitude]
  * @returns {Promise<Object>} produto salvo
  */
-export async function saveProduct({ userId, name, foodType, brand, price, weightG, portionG, proteinG, photoFile, storeName, latitude, longitude }) {
+export async function saveProduct({ userId, name, foodType, brand, price, weightG, portionG, proteinG, photoFile, storeName, city, latitude, longitude }) {
   let photoUrl = null
 
   // Upload de foto (se houver)
@@ -63,6 +64,7 @@ export async function saveProduct({ userId, name, foodType, brand, price, weight
       protein_g:  proteinG,
       photo_url:  photoUrl,
       store_name: storeName?.trim() || null,
+      city:       city?.trim() || null,
       latitude:   latitude  ?? null,
       longitude:  longitude ?? null,
     })
@@ -83,7 +85,7 @@ export async function saveProduct({ userId, name, foodType, brand, price, weight
 export async function getMyProducts(userId) {
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, brand, food_type, price, weight_g, portion_g, protein_g, price_per_g_protein, store_name, city, created_at')
+    .select('id, name, brand, food_type, price, weight_g, portion_g, protein_g, price_per_g_protein, photo_url, store_name, city, created_at')
     .eq('user_id', userId)
     .eq('is_active', true)
     .order('created_at', { ascending: false })
@@ -117,9 +119,25 @@ export async function getRanking({ foodType = null, limit = 60 } = {}) {
 }
 
 /**
- * Remove um produto (soft delete por RLS — só funciona para o próprio usuário).
+ * Remove um produto (só funciona para o próprio usuário devido ao RLS).
+ * Também remove a foto associada no Storage caso exista, evitando arquivos órfãos.
  */
-export async function deleteProduct(productId) {
+export async function deleteProduct(productId, photoUrl = null) {
+  // 1. Se houver foto, remove do storage do Supabase
+  if (photoUrl) {
+    try {
+      const url = new URL(photoUrl)
+      // Caminho padrão: /storage/v1/object/public/product-photos/userId/timestamp.ext
+      const match = url.pathname.match(/product-photos\/(.+)$/)
+      if (match && match[1]) {
+        await supabase.storage.from('product-photos').remove([decodeURIComponent(match[1])])
+      }
+    } catch (e) {
+      console.warn('[Storage] Falha ao deletar foto correspondente:', e)
+    }
+  }
+
+  // 2. Remove registro no banco
   const { error } = await supabase
     .from('products')
     .delete()

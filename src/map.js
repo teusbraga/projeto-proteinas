@@ -97,14 +97,19 @@ export async function initMap(mapContainerId, geocoderContainerId) {
   // Quando o geocoder encontra um resultado, coloca o marcador
   geocoder.on('result', (e) => {
     const [lng, lat] = e.result.center
-    setMarker(lng, lat, e.result.place_name)
+    let city = null
+    if (e.result.context) {
+      const placeCtx = e.result.context.find(c => c.id.startsWith('place.') || c.id.startsWith('municipality.'))
+      city = placeCtx?.text || null
+    }
+    setMarker(lng, lat, e.result.place_name, city)
   })
 
   // Click no mapa — faz reverse geocoding e coloca marcador
   map.on('click', async (e) => {
     const { lng, lat } = e.lngLat
-    const placeName = await reverseGeocode(lng, lat)
-    setMarker(lng, lat, placeName)
+    const { placeName, city } = await reverseGeocode(lng, lat)
+    setMarker(lng, lat, placeName, city)
   })
 
   return map
@@ -122,7 +127,7 @@ export function destroyMap() {
 // Funções internas
 // ============================================================
 
-function setMarker(lng, lat, placeName) {
+function setMarker(lng, lat, placeName, city = null) {
   // Remove marcador anterior
   marker?.remove()
 
@@ -133,7 +138,7 @@ function setMarker(lng, lat, placeName) {
       .addTo(map)
   }
 
-  selectedLocation = { lng, lat, placeName }
+  selectedLocation = { lng, lat, placeName, city }
 
   // Atualiza o display no modal
   const display = document.getElementById('selected-location-display')
@@ -146,11 +151,21 @@ async function reverseGeocode(lng, lat) {
   try {
     const res = await fetch(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json` +
-      `?access_token=${TOKEN}&language=pt-BR&types=poi,address&limit=1`
+      `?access_token=${TOKEN}&language=pt-BR&types=poi,address,place&limit=1`
     )
     const json = await res.json()
-    return json.features?.[0]?.place_name ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    const feature = json.features?.[0]
+    const placeName = feature?.place_name ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    
+    // Extrai o nome da cidade a partir do contexto do Mapbox
+    let city = null
+    if (feature?.context) {
+      const placeCtx = feature.context.find(c => c.id.startsWith('place.') || c.id.startsWith('municipality.'))
+      city = placeCtx?.text || null
+    }
+
+    return { placeName, city }
   } catch {
-    return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    return { placeName: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, city: null }
   }
 }
