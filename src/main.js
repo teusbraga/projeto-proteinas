@@ -42,8 +42,8 @@ async function init() {
   onAuthChange(async (user) => {
     state.user = user
 
-    // Limpa a URL poluída com #access_token=... após o Supabase capturar a sessão
-    if (window.location.hash && (window.location.hash.includes('access_token=') || window.location.hash.includes('error='))) {
+    // Remove qualquer '#' ou parâmetros de token da barra de endereço
+    if (window.location.hash) {
       window.history.replaceState(null, '', window.location.pathname + window.location.search)
     }
 
