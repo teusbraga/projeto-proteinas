@@ -120,12 +120,6 @@ body::before {
   height: 68px;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .btn-hamburger {
   display: none; /* Oculto por padrão no desktop */
   background: transparent;
@@ -1361,21 +1355,30 @@ body.drawer-open-lock {
   }
 
   .header-inner {
+    position: relative;
     height: 58px;
     padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
   .btn-hamburger {
     display: flex;
+    z-index: 2;
   }
 
-  /* Oculta nav e botão sair do topo para não quebrar o layout */
-  .header-nav {
-    display: none !important;
-  }
-
-  .header-mobile-right {
+  /* Centraliza perfeitamente o nome e ícone no meio da barra flutuante */
+  .header-brand {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    z-index: 1;
+    white-space: nowrap;
   }
 
   .header-brand .brand-name {
@@ -1385,6 +1388,19 @@ body.drawer-open-lock {
   .header-brand .brand-icon {
     font-size: 1.3rem;
     padding: 4px;
+  }
+
+  /* Oculta nav e botão sair do topo para não quebrar o layout */
+  .header-nav {
+    display: none !important;
+  }
+
+  .header-mobile-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 40px;
+    z-index: 2;
   }
 
   .hero { padding: 40px 0 28px; }
