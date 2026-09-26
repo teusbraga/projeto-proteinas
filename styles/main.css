@@ -2253,6 +2253,7 @@ body.drawer-open-lock {
   .header {
     position: sticky;
     top: 0;
+    padding-top: env(safe-area-inset-top, 0px);
     background: var(--header-bg);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -2353,7 +2354,7 @@ body.drawer-open-lock {
     max-height: 88vh;
     overflow-y: auto;
     width: 100%;
-    padding: 20px 18px 36px;
+    padding: 20px 18px calc(36px + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.22);
     animation: slide-up-modal 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     border: 1px solid var(--border);
@@ -2401,7 +2402,7 @@ body.drawer-open-lock {
   .mobile-fab {
     display: flex;
     position: fixed;
-    bottom: 22px;
+    bottom: calc(22px + env(safe-area-inset-bottom, 0px));
     right: 20px;
     z-index: 990;
   }

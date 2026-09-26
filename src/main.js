@@ -1285,3 +1285,14 @@ function setupGlobalEvents() {
 // START
 // ============================================================
 init()
+
+// ============================================================
+// PWA SERVICE WORKER REGISTRATION
+// ============================================================
+if ('serviceWorker' in navigator && (import.meta.env.PROD || !window.location.hostname.includes('localhost'))) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('[PWA] Service Worker registration failed:', err)
+    })
+  })
+}
