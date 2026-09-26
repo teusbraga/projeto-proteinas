@@ -519,13 +519,12 @@ async function handleFormSubmit(e) {
     showToast('Produto adicionado ao ranking global! 🎉', 'success')
     resetFormUI()
 
-    // Recarrega listas, mapa e atualiza cidades disponíveis
+    // Recarrega listas, mapa e estatísticas
     await Promise.all([
       loadRanking(),
       loadMyProducts(),
       loadGlobalMap(),
       loadPersonalRanking(),
-      refreshCityDropdown(),
       loadStats(state.currency),
     ])
 
@@ -1065,9 +1064,6 @@ function setupFilters() {
     showToast('Filtro por proximidade desativado.', 'info')
     await reloadActiveRanking()
   })
-
-  // Inicializa lista de cidades no dropdown
-  refreshCityDropdown()
 }
 
 async function reloadActiveRanking() {
