@@ -20,18 +20,73 @@
   <!-- ===================== HEADER ===================== -->
   <header class="header" id="header">
     <div class="container header-inner">
-      <div class="header-brand">
-        <span class="brand-icon">💪</span>
-        <span class="brand-name">ProteinPrice</span>
+      <div class="header-left">
+        <!-- 3 tracinhos do lado esquerdo no mobile -->
+        <button class="btn-hamburger" id="btn-hamburger" aria-label="Abrir menu" aria-expanded="false">
+          <span class="hamburger-bar"></span>
+          <span class="hamburger-bar"></span>
+          <span class="hamburger-bar"></span>
+        </button>
+        <div class="header-brand">
+          <span class="brand-icon">💪</span>
+          <span class="brand-name">ProteinPrice</span>
+        </div>
       </div>
       <nav class="header-nav">
         <button class="btn-ghost" id="btn-scroll-ranking">🏆 Ranking</button>
         <div id="auth-widget">
-          <!-- Preenchido pelo JS -->
+          <!-- Preenchido pelo JS no Desktop -->
         </div>
       </nav>
+      <!-- Atalho no mobile (avatar ou login) -->
+      <div class="header-mobile-right" id="header-mobile-right">
+        <!-- Preenchido pelo JS -->
+      </div>
     </div>
   </header>
+
+  <!-- ===================== DRAWER LATERAL MÓVEL ===================== -->
+  <div class="drawer-overlay hidden" id="drawer-overlay" aria-hidden="true"></div>
+  <aside class="mobile-drawer" id="mobile-drawer" aria-label="Menu principal" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-brand">
+        <span class="brand-icon">💪</span>
+        <span class="brand-name">ProteinPrice</span>
+      </div>
+      <button class="drawer-close" id="btn-close-drawer" aria-label="Fechar menu">&times;</button>
+    </div>
+
+    <!-- Perfil ou Login do Usuário no Drawer -->
+    <div class="drawer-auth" id="drawer-auth-section">
+      <!-- Preenchido pelo JS -->
+    </div>
+
+    <!-- Navegação rápida no Drawer -->
+    <nav class="drawer-nav">
+      <button class="drawer-nav-item" id="drawer-nav-ranking">
+        <span class="drawer-nav-icon">🏆</span>
+        <span class="drawer-nav-text">Ranking Global</span>
+      </button>
+      <button class="drawer-nav-item" id="drawer-nav-personal">
+        <span class="drawer-nav-icon">👤</span>
+        <span class="drawer-nav-text">Meu Ranking Pessoal</span>
+        <span id="drawer-badge-personal" class="badge-count hidden">0</span>
+      </button>
+      <button class="drawer-nav-item" id="drawer-nav-map">
+        <span class="drawer-nav-icon">🗺️</span>
+        <span class="drawer-nav-text">Mapa Comunitário</span>
+      </button>
+      <button class="drawer-nav-item highlight" id="drawer-nav-add">
+        <span class="drawer-nav-icon">➕</span>
+        <span class="drawer-nav-text">Adicionar Alimento</span>
+      </button>
+    </nav>
+
+    <div class="drawer-footer">
+      <div class="drawer-footer-version">ProteinPrice v1.1</div>
+      <div class="drawer-footer-desc">A proteína mais barata da sua cidade</div>
+    </div>
+  </aside>
 
   <main>
 
@@ -58,7 +113,7 @@
 
     <!-- ===================== ADD PRODUCT ===================== -->
     <section class="section" id="section-add">
-      <div class="container">
+      <div class="container modal-container-mobile">
         <div class="card" id="add-product-card">
           <!-- Login prompt ou formulário — preenchido pelo JS -->
           <div class="card-loading">

@@ -82,41 +82,119 @@ async function init() {
 }
 
 // ============================================================
-// AUTH WIDGET (header)
+// ============================================================
+// AUTH WIDGET (header & mobile drawer)
 // ============================================================
 
 function renderAuthWidget(user) {
   const widget = document.getElementById('auth-widget')
+  const mobileRight = document.getElementById('header-mobile-right')
+  const drawerAuth = document.getElementById('drawer-auth-section')
 
   if (user) {
     const firstName = user.user_metadata?.full_name?.split(' ')[0]
       ?? user.user_metadata?.name?.split(' ')[0]
       ?? 'Usuário'
     const avatar = user.user_metadata?.avatar_url ?? ''
+    const fullName = user.user_metadata?.full_name || user.user_metadata?.name || firstName
+    const email = user.email || ''
 
-    widget.innerHTML = `
-      <div class="user-widget">
-        ${avatar ? `<img class="avatar-img" src="${avatar}" alt="Avatar de ${firstName}" referrerpolicy="no-referrer">` : ''}
-        <span class="avatar-name">${firstName}</span>
-        <button class="btn-ghost" id="btn-signout">Sair</button>
-      </div>
-    `
-    document.getElementById('btn-signout').addEventListener('click', async () => {
-      try {
-        await signOut()
-        showToast('Sessão encerrada.', 'info')
-      } catch {
-        showToast('Erro ao sair.', 'error')
-      }
-    })
+    // 1. Desktop Header
+    if (widget) {
+      widget.innerHTML = `
+        <div class="user-widget">
+          ${avatar ? `<img class="avatar-img" src="${avatar}" alt="Avatar de ${firstName}" referrerpolicy="no-referrer">` : ''}
+          <span class="avatar-name">${firstName}</span>
+          <button class="btn-ghost" id="btn-signout">Sair</button>
+        </div>
+      `
+      document.getElementById('btn-signout')?.addEventListener('click', handleSignOut)
+    }
+
+    // 2. Mobile Top Bar Right (Avatar clicável que abre o menu lateral)
+    if (mobileRight) {
+      mobileRight.innerHTML = `
+        <button class="btn-mobile-avatar" id="btn-mobile-avatar" aria-label="Abrir menu do perfil">
+          ${avatar ? `<img class="avatar-img-sm" src="${avatar}" alt="Avatar" referrerpolicy="no-referrer">` : `<span class="avatar-letter">${firstName[0]}</span>`}
+        </button>
+      `
+      document.getElementById('btn-mobile-avatar')?.addEventListener('click', openDrawer)
+    }
+
+    // 3. Mobile Drawer (Perfil completo + Botão Sair espaçoso que não quebra o topo)
+    if (drawerAuth) {
+      drawerAuth.innerHTML = `
+        <div class="drawer-user-card">
+          <div class="drawer-avatar-wrap">
+            ${avatar
+              ? `<img class="drawer-avatar-img" src="${avatar}" alt="Avatar de ${firstName}" referrerpolicy="no-referrer">`
+              : `<div class="drawer-avatar-placeholder">${firstName[0]}</div>`}
+          </div>
+          <div class="drawer-user-info">
+            <div class="drawer-user-name">${escapeHtml(fullName)}</div>
+            <div class="drawer-user-email">${escapeHtml(email)}</div>
+            <span class="drawer-user-badge">🟢 Conectado</span>
+          </div>
+        </div>
+        <button class="btn-drawer-signout" id="btn-drawer-signout">
+          🚪 Sair da Conta
+        </button>
+      `
+      document.getElementById('btn-drawer-signout')?.addEventListener('click', handleSignOut)
+    }
+
   } else {
-    widget.innerHTML = `
-      <button class="btn-primary" id="btn-login-header">
-        ${googleIcon()}
-        Entrar com Google
-      </button>
-    `
-    document.getElementById('btn-login-header').addEventListener('click', () => signInWithGoogle())
+    // 1. Desktop Header
+    if (widget) {
+      widget.innerHTML = `
+        <button class="btn-primary" id="btn-login-header">
+          ${googleIcon()}
+          Entrar com Google
+        </button>
+      `
+      document.getElementById('btn-login-header')?.addEventListener('click', () => signInWithGoogle())
+    }
+
+    // 2. Mobile Top Bar Right (Botão Entrar discreto)
+    if (mobileRight) {
+      mobileRight.innerHTML = `
+        <button class="btn-mobile-login" id="btn-mobile-login" aria-label="Fazer Login">
+          Entrar
+        </button>
+      `
+      document.getElementById('btn-mobile-login')?.addEventListener('click', () => signInWithGoogle())
+    }
+
+    // 3. Mobile Drawer
+    if (drawerAuth) {
+      drawerAuth.innerHTML = `
+        <div class="drawer-guest-card">
+          <div class="drawer-guest-icon">👋</div>
+          <div class="drawer-guest-content">
+            <div class="drawer-guest-title">Modo Visitante</div>
+            <p class="drawer-guest-text">Faça login com Google para salvar seus produtos na nuvem e colaborar com o Ranking Global.</p>
+          </div>
+        </div>
+        <button class="btn-primary btn-drawer-login" id="btn-drawer-login">
+          ${googleIcon()}
+          Entrar com Google
+        </button>
+      `
+      document.getElementById('btn-drawer-login')?.addEventListener('click', () => {
+        closeDrawer()
+        signInWithGoogle()
+      })
+    }
+  }
+}
+
+async function handleSignOut() {
+  try {
+    closeDrawer()
+    await signOut()
+    showToast('Sessão encerrada.', 'info')
+  } catch {
+    showToast('Erro ao sair.', 'error')
   }
 }
 
@@ -140,7 +218,10 @@ function renderAddSection(user) {
     : ''
 
   card.innerHTML = `
-    <h2 class="form-title">➕ Adicionar Produto</h2>
+    <div class="form-header-row">
+      <h2 class="form-title">➕ Adicionar Produto</h2>
+      <button type="button" class="btn-close-product-modal" id="btn-close-product-modal" aria-label="Fechar formulário">&times;</button>
+    </div>
     ${authNotice}
     <form id="product-form" novalidate autocomplete="off">
       <div class="form-grid">
@@ -259,6 +340,9 @@ function setupFormEvents() {
       }
     })
   })
+
+  // Fechar modal do formulário no mobile
+  document.getElementById('btn-close-product-modal')?.addEventListener('click', closeProductModal)
 
   // Submit
   document.getElementById('product-form')?.addEventListener('submit', handleFormSubmit)
@@ -451,6 +535,8 @@ function resetFormUI() {
 
   const calcWrapper = document.getElementById('calc-preview-wrapper')
   if (calcWrapper) calcWrapper.style.display = 'none'
+
+  closeProductModal()
 }
 
 
@@ -594,15 +680,21 @@ async function loadPersonalRanking() {
   // 1. Obtém os produtos locais do LocalStorage
   const localProducts = getLocalProducts()
 
-  // Atualiza badge de contagem
+  // Atualiza badge de contagem (desktop tabs e drawer mobile)
   const badge = document.getElementById('local-count-badge')
-  if (badge) {
-    if (localProducts.length > 0) {
+  const drawerBadge = document.getElementById('drawer-badge-personal')
+  if (localProducts.length > 0) {
+    if (badge) {
       badge.textContent = localProducts.length
       badge.classList.remove('hidden')
-    } else {
-      badge.classList.add('hidden')
     }
+    if (drawerBadge) {
+      drawerBadge.textContent = localProducts.length
+      drawerBadge.classList.remove('hidden')
+    }
+  } else {
+    badge?.classList.add('hidden')
+    drawerBadge?.classList.add('hidden')
   }
 
   // Se o usuário estiver logado, mescla com os produtos salvos na conta dele
@@ -743,6 +835,59 @@ async function syncLocalToSupabase() {
 }
 
 // ============================================================
+// POPUP MODAL DO FORMULÁRIO DE PRODUTO (Mobile)
+// ============================================================
+
+export function openProductModal() {
+  const addSection = document.getElementById('section-add')
+  if (!addSection) return
+  addSection.classList.add('mobile-modal-open')
+  document.body.classList.add('modal-open-lock')
+  setTimeout(() => {
+    document.getElementById('f-name')?.focus()
+  }, 150)
+}
+
+export function closeProductModal() {
+  const addSection = document.getElementById('section-add')
+  if (!addSection) return
+  addSection.classList.remove('mobile-modal-open')
+  document.body.classList.remove('modal-open-lock')
+}
+
+// ============================================================
+// DRAWER LATERAL MÓVEL (Menu Hambúrguer 3 tracinhos)
+// ============================================================
+
+export function openDrawer() {
+  const drawer = document.getElementById('mobile-drawer')
+  const overlay = document.getElementById('drawer-overlay')
+  const btn = document.getElementById('btn-hamburger')
+  if (!drawer || !overlay) return
+
+  drawer.classList.add('open')
+  drawer.setAttribute('aria-hidden', 'false')
+  overlay.classList.remove('hidden')
+  overlay.setAttribute('aria-hidden', 'false')
+  btn?.setAttribute('aria-expanded', 'true')
+  document.body.classList.add('drawer-open-lock')
+}
+
+export function closeDrawer() {
+  const drawer = document.getElementById('mobile-drawer')
+  const overlay = document.getElementById('drawer-overlay')
+  const btn = document.getElementById('btn-hamburger')
+  if (!drawer || !overlay) return
+
+  drawer.classList.remove('open')
+  drawer.setAttribute('aria-hidden', 'true')
+  overlay.classList.add('hidden')
+  overlay.setAttribute('aria-hidden', 'true')
+  btn?.setAttribute('aria-expanded', 'false')
+  document.body.classList.remove('drawer-open-lock')
+}
+
+// ============================================================
 // BOTÃO FLUTUANTE MÓVEL (+)
 // ============================================================
 
@@ -751,18 +896,9 @@ function setupMobileFab() {
   if (!fab) return
 
   fab.addEventListener('click', () => {
-    const addSection = document.getElementById('section-add')
-    if (addSection) {
-      addSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      // Foca no primeiro input para agilizar digitação no mobile
-      setTimeout(() => {
-        document.getElementById('f-name')?.focus()
-      }, 400)
-    }
+    openProductModal()
   })
 }
-
-
 
 // ============================================================
 // FILTROS DO RANKING
@@ -788,22 +924,67 @@ function setupFilters() {
 // ============================================================
 
 function setupGlobalEvents() {
-  // Scroll para ranking
+  // Scroll para ranking no desktop header
   document.getElementById('btn-scroll-ranking')?.addEventListener('click', () => {
     document.getElementById('section-ranking')?.scrollIntoView({ behavior: 'smooth' })
+  })
+
+  // Menu Hambúrguer (3 tracinhos no lado esquerdo)
+  document.getElementById('btn-hamburger')?.addEventListener('click', () => {
+    openDrawer()
+  })
+
+  // Fechar Drawer
+  document.getElementById('btn-close-drawer')?.addEventListener('click', () => {
+    closeDrawer()
+  })
+  document.getElementById('drawer-overlay')?.addEventListener('click', () => {
+    closeDrawer()
+  })
+
+  // Navegação dentro do Drawer Lateral
+  document.getElementById('drawer-nav-ranking')?.addEventListener('click', () => {
+    closeDrawer()
+    switchTab('global')
+    document.getElementById('section-ranking')?.scrollIntoView({ behavior: 'smooth' })
+  })
+  document.getElementById('drawer-nav-personal')?.addEventListener('click', () => {
+    closeDrawer()
+    switchTab('personal')
+    document.getElementById('section-ranking')?.scrollIntoView({ behavior: 'smooth' })
+  })
+  document.getElementById('drawer-nav-map')?.addEventListener('click', () => {
+    closeDrawer()
+    document.getElementById('section-global-map')?.scrollIntoView({ behavior: 'smooth' })
+  })
+  document.getElementById('drawer-nav-add')?.addEventListener('click', () => {
+    closeDrawer()
+    openProductModal()
+  })
+
+  // Clicar fora do card de produto no modal mobile fecha ele
+  const addSection = document.getElementById('section-add')
+  addSection?.addEventListener('click', (e) => {
+    if (e.target === addSection || e.target.classList.contains('modal-container-mobile')) {
+      closeProductModal()
+    }
   })
 
   // Fechar modal do mapa
   document.getElementById('btn-close-modal')?.addEventListener('click', () => closeMapModal())
 
-  // Clicar fora do modal fecha ele
+  // Clicar fora do modal do mapa fecha ele
   document.getElementById('map-modal-overlay')?.addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeMapModal()
   })
 
-  // ESC fecha o modal
+  // ESC fecha qualquer modal aberto ou drawer
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeMapModal()
+    if (e.key === 'Escape') {
+      closeMapModal()
+      closeProductModal()
+      closeDrawer()
+    }
   })
 }
 

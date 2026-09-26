@@ -125,22 +125,11 @@ export async function getRanking({ foodType = null, limit = 60 } = {}) {
 
 /**
  * Busca os últimos 100 alfinetes/pontos geográficos no mapa global.
+ * Consulta diretamente da tabela products para evitar erro 404 de tabelas não migradas.
  * @returns {Promise<Array<Object>>}
  */
 export async function getLatestPins(limit = 100) {
-  // Tenta buscar primeiro da tabela store_pins (se migrada) ou fallback direto de products com coordenadas
   const { data, error } = await supabase
-    .from('store_pins')
-    .select('id, place_name, city, latitude, longitude, product_name, price_per_g, created_at')
-    .order('created_at', { ascending: false })
-    .limit(limit)
-
-  if (!error && data && data.length > 0) {
-    return data
-  }
-
-  // Fallback caso a tabela store_pins ainda não tenha sido populada
-  const { data: prodData } = await supabase
     .from('products')
     .select('id, store_name, city, latitude, longitude, name, price_per_g_protein, created_at')
     .not('latitude', 'is', null)
@@ -149,7 +138,9 @@ export async function getLatestPins(limit = 100) {
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  return (prodData || []).map(p => ({
+  if (error || !data) return []
+
+  return data.map(p => ({
     id: p.id,
     place_name: p.store_name,
     city: p.city,
