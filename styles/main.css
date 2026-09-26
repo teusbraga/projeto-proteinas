@@ -249,15 +249,15 @@ body::before {
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 14px var(--primary-glow);
+  transition: background 0.15s ease, transform 0.15s ease;
+  box-shadow: none;
   white-space: nowrap;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px var(--primary-glow);
+  box-shadow: none;
 }
 
 .btn-primary:active { transform: translateY(0); }
@@ -339,6 +339,51 @@ body::before {
 
 .lang-code {
   letter-spacing: 0.05em;
+}
+
+/* ============================================================
+   REMOÇÃO GLOBAL DE SOMBRAS EM TODOS OS BOTÕES (Design Clean & Flat)
+   ============================================================ */
+button,
+.btn-primary,
+.btn-ghost,
+.btn-icon,
+.btn-lang,
+.btn-danger,
+.btn-modal-gps,
+.btn-proximity,
+.btn-clear-proximity,
+.btn-clear-city,
+.btn-drawer-signout,
+.btn-drawer-login,
+.btn-drawer-control,
+.btn-mobile-login,
+.btn-hamburger,
+.btn-close-product-modal,
+.modal-close,
+.tab-btn,
+.location-btn,
+.filter-btn,
+.mobile-fab,
+.btn-tool-subtle,
+#btn-submit,
+#btn-confirm-location,
+#btn-modal-my-location {
+  box-shadow: none !important;
+}
+
+button:hover,
+button:active,
+button:focus,
+.btn-primary:hover,
+.btn-modal-gps:hover,
+.btn-proximity:hover,
+.filter-btn:hover,
+.tab-btn:hover,
+.location-btn:hover,
+.mobile-fab:hover,
+#btn-submit:hover {
+  box-shadow: none !important;
 }
 
 /* === HEADER TOOLS (Desktop: Discretos e colados à direita) === */
@@ -792,7 +837,18 @@ body::before {
 
 .form-actions {
   grid-column: 1 / -1;
-  margin-top: 10px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.form-actions #btn-submit {
+  min-width: 240px;
+  max-width: 100%;
+  justify-content: center;
+  text-align: center;
 }
 
 /* Login Prompt Card */
@@ -1078,7 +1134,7 @@ body::before {
   background: var(--primary);
   border-color: var(--primary);
   color: #ffffff;
-  box-shadow: 0 2px 8px var(--primary-glow);
+  box-shadow: none;
 }
 
 .btn-proximity.loading {
@@ -1363,7 +1419,7 @@ body::before {
   font-size: 2rem;
   font-weight: 400;
   line-height: 1;
-  box-shadow: 0 8px 24px rgba(234, 88, 12, 0.4);
+  box-shadow: none;
   cursor: pointer;
   align-items: center;
   justify-content: center;
@@ -1693,7 +1749,7 @@ body::before {
   gap: 6px;
   cursor: pointer;
   transition: all 0.18s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
 }
 
 .btn-modal-gps:hover {
@@ -2292,6 +2348,23 @@ body.drawer-open-lock {
     animation: slide-up-modal 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     border: 1px solid var(--border);
     border-bottom: none;
+  }
+
+  #section-add.mobile-modal-open .form-actions {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin-top: 18px;
+  }
+
+  #section-add.mobile-modal-open #btn-submit {
+    width: 100%;
+    max-width: 320px;
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
   }
 
   .btn-close-product-modal {

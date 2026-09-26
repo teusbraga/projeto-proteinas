@@ -75,8 +75,8 @@ export const translations = {
     locationFieldLabel: 'Local de Compra',
     locationFieldOptional: '(opcional)',
     locationBtnDefault: 'Selecionar local no mapa',
-    btnSubmitGlobal: '🚀 Adicionar ao Ranking Global',
-    btnSubmitLocal: '💾 Salvar no Meu Ranking',
+    btnSubmitGlobal: 'Adicionar ao Ranking',
+    btnSubmitLocal: 'Salvar no Meu Ranking',
     btnSubmitting: 'Salvando...',
 
     // Mapa Global
@@ -215,8 +215,8 @@ export const translations = {
     locationFieldLabel: 'Purchase Location',
     locationFieldOptional: '(optional)',
     locationBtnDefault: 'Pin location on map',
-    btnSubmitGlobal: '🚀 Add to Global Leaderboard',
-    btnSubmitLocal: '💾 Save to My Ranking',
+    btnSubmitGlobal: 'Add to Ranking',
+    btnSubmitLocal: 'Save to My Ranking',
     btnSubmitting: 'Saving...',
 
     // Mapa Global
