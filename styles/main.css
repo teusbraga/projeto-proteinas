@@ -867,12 +867,22 @@ button:focus,
 }
 
 /* === MAPA GLOBAL CARD === */
+#section-global-map {
+  padding-top: 4px;
+  padding-bottom: 24px;
+}
+
 .global-map-card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 10px;
   box-shadow: var(--shadow-sm);
+  margin-bottom: 14px;
+}
+
+.map-header-below {
+  margin-bottom: 0;
 }
 
 /* === ABAS DO RANKING (Global vs Meu Ranking) === */
