@@ -1,5 +1,6 @@
 import 'mapbox-gl/dist/mapbox-gl.css'
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
+import { escapeHtml } from './utils.js'
 
 const TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
@@ -47,8 +48,16 @@ export async function initGlobalMap(containerId, pins = []) {
     globalMap = null
   }
 
-  // Se houver pins com coordenadas, centraliza no primeiro ou no Brasil
-  const firstValid = pins.find(p => p.latitude && p.longitude)
+  // Identifica o menor preço para destacar o alfinete dourado (campeão do custo-benefício)
+  const validPinsWithPrice = pins.filter(p => p.latitude && p.longitude && p.price_per_g != null && Number(p.price_per_g) > 0)
+  const minPrice = validPinsWithPrice.length > 0
+    ? Math.min(...validPinsWithPrice.map(p => Number(p.price_per_g)))
+    : null
+
+  const cheapestPin = validPinsWithPrice.find(p => minPrice != null && Math.abs(Number(p.price_per_g) - minPrice) < 0.0001)
+
+  // Centraliza no campeão de melhor preço ou no primeiro pin com coordenadas
+  const firstValid = cheapestPin || pins.find(p => p.latitude && p.longitude)
   const initialCenter = firstValid
     ? [Number(firstValid.longitude), Number(firstValid.latitude)]
     : [-46.6333, -23.5505]
@@ -57,32 +66,56 @@ export async function initGlobalMap(containerId, pins = []) {
     container: containerId,
     style: 'mapbox://styles/mapbox/light-v11', // Tema claro alinhado à nova paleta
     center: initialCenter,
-    zoom: firstValid ? 11 : 4,
+    zoom: firstValid ? 12 : 4,
     cooperativeGestures: true, // melhora scroll em celulares
   })
 
   // Adiciona controles de navegação
   globalMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
 
-  // Plota os pins
+  // Plota os pins personalizados com preços
   pins.forEach(pin => {
     if (!pin.latitude || !pin.longitude) return
 
-    const priceFormatted = pin.price_per_g
-      ? `<strong>R$ ${Number(pin.price_per_g).toFixed(4)}/g</strong>`
+    const priceNum = pin.price_per_g ? Number(pin.price_per_g) : null
+    const isCheapest = minPrice != null && priceNum != null && Math.abs(priceNum - minPrice) < 0.0001
+
+    // Elemento HTML customizado para o Pin (Pílula de Preço estilo Airbnb)
+    const el = document.createElement('div')
+    el.className = `map-pin-pill ${isCheapest ? 'pin-cheapest' : ''}`
+    if (isCheapest) {
+      el.style.zIndex = '50'
+    }
+
+    const priceShort = priceNum != null
+      ? `R$ ${priceNum.toFixed(4)}/g`
+      : 'Proteína'
+
+    el.innerHTML = `
+      <div class="pin-pill-content">
+        ${isCheapest ? '<span class="pin-crown" title="Menor Preço da Cidade">👑</span>' : ''}
+        <span class="pin-price-text">${priceShort}</span>
+      </div>
+      <div class="pin-pill-tail"></div>
+    `
+
+    const priceFormatted = priceNum != null
+      ? `<strong>R$ ${priceNum.toFixed(4)}</strong> por grama de proteína`
       : ''
 
     const popupHtml = `
-      <div style="font-family:inherit;padding:4px">
-        <h4 style="margin:0 0 4px;font-size:0.95rem;color:#1e293b">${pin.product_name || 'Produto'}</h4>
-        <p style="margin:0 0 4px;font-size:0.8rem;color:#ea580c">📍 ${pin.place_name || 'Local informado'}</p>
-        ${priceFormatted ? `<div style="font-size:0.85rem;color:#16a34a">${priceFormatted}</div>` : ''}
+      <div class="map-popup-card">
+        ${isCheapest ? '<div class="popup-badge-gold">👑 Campeão do Custo-Benefício</div>' : ''}
+        <h4 class="popup-product-title">${escapeHtml(pin.product_name || 'Produto')}</h4>
+        <p class="popup-place-name">📍 ${escapeHtml(pin.place_name || 'Local informado')}${pin.city ? ` — ${escapeHtml(pin.city)}` : ''}</p>
+        ${priceFormatted ? `<div class="popup-price-tag">${priceFormatted}</div>` : ''}
       </div>
     `
 
-    const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml)
+    const popup = new mapboxgl.Popup({ offset: [0, -18], closeButton: true, maxWidth: '280px' })
+      .setHTML(popupHtml)
 
-    new mapboxgl.Marker({ color: '#f97316', scale: 0.9 })
+    new mapboxgl.Marker({ element: el, anchor: 'bottom' })
       .setLngLat([Number(pin.longitude), Number(pin.latitude)])
       .setPopup(popup)
       .addTo(globalMap)
