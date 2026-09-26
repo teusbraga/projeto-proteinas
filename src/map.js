@@ -19,6 +19,78 @@ let selectedLocation = null
 // API pública do módulo
 // ============================================================
 
+/** @type {any} */
+let globalMap = null
+
+/**
+ * Inicializa o mapa global na página inicial com os últimos alfinetes.
+ *
+ * @param {string} containerId - ID do elemento do mapa global
+ * @param {Array<Object>} pins - Lista dos últimos pins
+ */
+export async function initGlobalMap(containerId, pins = []) {
+  if (!TOKEN) return null
+
+  if (!mapboxglModule) {
+    const mbModule = await import('mapbox-gl')
+    mapboxglModule = mbModule.default || mbModule
+  }
+  const mapboxgl = mapboxglModule
+
+  mapboxgl.accessToken = TOKEN
+
+  const container = document.getElementById(containerId)
+  if (!container) return null
+
+  if (globalMap) {
+    globalMap.remove()
+    globalMap = null
+  }
+
+  // Se houver pins com coordenadas, centraliza no primeiro ou no Brasil
+  const firstValid = pins.find(p => p.latitude && p.longitude)
+  const initialCenter = firstValid
+    ? [Number(firstValid.longitude), Number(firstValid.latitude)]
+    : [-46.6333, -23.5505]
+
+  globalMap = new mapboxgl.Map({
+    container: containerId,
+    style: 'mapbox://styles/mapbox/light-v11', // Tema claro alinhado à nova paleta
+    center: initialCenter,
+    zoom: firstValid ? 11 : 4,
+    cooperativeGestures: true, // melhora scroll em celulares
+  })
+
+  // Adiciona controles de navegação
+  globalMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right')
+
+  // Plota os pins
+  pins.forEach(pin => {
+    if (!pin.latitude || !pin.longitude) return
+
+    const priceFormatted = pin.price_per_g
+      ? `<strong>R$ ${Number(pin.price_per_g).toFixed(4)}/g</strong>`
+      : ''
+
+    const popupHtml = `
+      <div style="font-family:inherit;padding:4px">
+        <h4 style="margin:0 0 4px;font-size:0.95rem;color:#1e293b">${pin.product_name || 'Produto'}</h4>
+        <p style="margin:0 0 4px;font-size:0.8rem;color:#ea580c">📍 ${pin.place_name || 'Local informado'}</p>
+        ${priceFormatted ? `<div style="font-size:0.85rem;color:#16a34a">${priceFormatted}</div>` : ''}
+      </div>
+    `
+
+    const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml)
+
+    new mapboxgl.Marker({ color: '#f97316', scale: 0.9 })
+      .setLngLat([Number(pin.longitude), Number(pin.latitude)])
+      .setPopup(popup)
+      .addTo(globalMap)
+  })
+
+  return globalMap
+}
+
 /** Retorna a localização selecionada atualmente (ou null). */
 export function getSelectedLocation() {
   return selectedLocation

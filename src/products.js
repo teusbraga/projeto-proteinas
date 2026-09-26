@@ -96,16 +96,21 @@ export async function getMyProducts(userId) {
 
 /**
  * Busca o ranking público ordenado pelo menor preço/g proteína.
+ * Aplica a regra de expiração de 30 dias (apenas produtos recentes).
  *
  * @param {Object}  [opts]
  * @param {string}  [opts.foodType] - 'animal' | 'vegetal' | null (todos)
  * @param {number}  [opts.limit]
  */
 export async function getRanking({ foodType = null, limit = 60 } = {}) {
+  // Limite de 30 dias atrás
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
   let query = supabase
     .from('products')
     .select('id, name, brand, food_type, price_per_g_protein, photo_url, store_name, city, created_at')
     .eq('is_active', true)
+    .gte('created_at', thirtyDaysAgo)
     .order('price_per_g_protein', { ascending: true })
     .limit(limit)
 
@@ -116,6 +121,44 @@ export async function getRanking({ foodType = null, limit = 60 } = {}) {
   const { data, error } = await query
   if (error) throw error
   return data ?? []
+}
+
+/**
+ * Busca os últimos 100 alfinetes/pontos geográficos no mapa global.
+ * @returns {Promise<Array<Object>>}
+ */
+export async function getLatestPins(limit = 100) {
+  // Tenta buscar primeiro da tabela store_pins (se migrada) ou fallback direto de products com coordenadas
+  const { data, error } = await supabase
+    .from('store_pins')
+    .select('id, place_name, city, latitude, longitude, product_name, price_per_g, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (!error && data && data.length > 0) {
+    return data
+  }
+
+  // Fallback caso a tabela store_pins ainda não tenha sido populada
+  const { data: prodData } = await supabase
+    .from('products')
+    .select('id, store_name, city, latitude, longitude, name, price_per_g_protein, created_at')
+    .not('latitude', 'is', null)
+    .not('longitude', 'is', null)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  return (prodData || []).map(p => ({
+    id: p.id,
+    place_name: p.store_name,
+    city: p.city,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    product_name: p.name,
+    price_per_g: p.price_per_g_protein,
+    created_at: p.created_at,
+  }))
 }
 
 /**

@@ -13,11 +13,13 @@
 import { supabase } from './supabase.js'
 import { signInWithGoogle, signOut, onAuthChange } from './auth.js'
 import { calcularPrecoPorGrama, formatarPreco, validarCampos } from './calculator.js'
-import { saveProduct, getMyProducts, getRanking, deleteProduct, getStats, subscribeRanking } from './products.js'
+import { saveProduct, getMyProducts, getRanking, getLatestPins, deleteProduct, getStats, subscribeRanking } from './products.js'
 import { openMapModal, closeMapModal, resetMapModal } from './ui/modal.js'
 import { showToast } from './ui/toast.js'
-import { renderRankingList, renderMyProductsList } from './ui/ranking.js'
+import { renderRankingList, renderPersonalRankingList, renderMyProductsList } from './ui/ranking.js'
 import { compressImage, escapeHtml, googleIcon } from './utils.js'
+import { initGlobalMap } from './map.js'
+import { getLocalProducts, saveLocalProduct, deleteLocalProduct, clearLocalProducts } from './localRanking.js'
 
 // ============================================================
 // ESTADO GLOBAL DA APLICAÇÃO
@@ -25,9 +27,10 @@ import { compressImage, escapeHtml, googleIcon } from './utils.js'
 
 const state = {
   user:          null,    // User | null
+  activeTab:     'global',// 'global' | 'personal'
   filter:        'all',   // 'all' | 'animal' | 'vegetal'
   photoFile:     null,    // File | null
-  location:      null,    // { lat, lng, placeName } | null
+  location:      null,    // { lat, lng, placeName, city } | null
 }
 
 // ============================================================
@@ -37,6 +40,8 @@ const state = {
 async function init() {
   setupGlobalEvents()
   setupFilters()
+  setupTabs()
+  setupMobileFab()
 
   // Ouve mudanças de autenticação — dispara imediatamente com estado atual
   // e também processa automaticamente o callback OAuth do Google (PKCE ou Hash)
@@ -50,6 +55,7 @@ async function init() {
 
     renderAuthWidget(user)
     renderAddSection(user)
+    checkSyncBanner()
 
     if (user) {
       document.getElementById('section-my-products').classList.remove('hidden')
@@ -58,15 +64,20 @@ async function init() {
       document.getElementById('section-my-products').classList.add('hidden')
       document.getElementById('my-products-container').innerHTML = ''
     }
+
+    if (state.activeTab === 'personal') {
+      loadPersonalRanking()
+    }
   })
 
-  // Ranking e stats podem carregar em paralelo sem depender de auth
-  await Promise.all([loadRanking(), loadStats()])
+  // Carrega em paralelo: Ranking Global, Mapa Global com 100 pins, Stats do Hero e Meu Ranking
+  await Promise.all([loadRanking(), loadGlobalMap(), loadStats(), loadPersonalRanking()])
 
   // Realtime: atualiza ranking quando alguém insere/altera/remove um produto
   subscribeRanking(() => {
     loadRanking()
     loadStats()
+    loadGlobalMap()
   })
 }
 
@@ -115,32 +126,22 @@ function renderAuthWidget(user) {
 
 function renderAddSection(user) {
   const card = document.getElementById('add-product-card')
-
-  if (!user) {
-    card.innerHTML = `
-      <div class="login-prompt">
-        <div class="login-prompt-icon">🔐</div>
-        <div class="login-prompt-title">Entre para contribuir com a comunidade</div>
-        <div class="login-prompt-subtitle">
-          Cadastre produtos, marque o local onde você encontrou e ajude a comunidade
-          a encontrar a proteína mais barata da cidade.
-        </div>
-        <button class="btn-primary" id="btn-login-card">
-          ${googleIcon()}
-          Entrar com Google
-        </button>
-      </div>
-    `
-    document.getElementById('btn-login-card').addEventListener('click', () => signInWithGoogle())
-    return
-  }
+  if (!card) return
 
   // Reset de estado do formulário ao recarregar
   state.photoFile = null
   state.location = null
 
+  const authNotice = !user
+    ? `<div style="background:var(--primary-light);border:1px solid rgba(255,107,74,0.3);padding:10px 14px;border-radius:10px;font-size:0.85rem;color:var(--primary-dark);margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+         <span>💡 <strong>Modo Visitante:</strong> seus produtos serão salvos no <em>Meu Ranking</em> deste navegador. Faça login com o Google para publicar no Ranking Global!</span>
+         <button type="button" class="btn-primary" id="btn-quick-login" style="padding:4px 10px;font-size:0.75rem">Fazer Login</button>
+       </div>`
+    : ''
+
   card.innerHTML = `
     <h2 class="form-title">➕ Adicionar Produto</h2>
+    ${authNotice}
     <form id="product-form" novalidate autocomplete="off">
       <div class="form-grid">
 
@@ -198,12 +199,12 @@ function renderAddSection(user) {
           </div>
         </div>
 
-        <!-- Foto -->
+        <!-- Foto & Câmera -->
         <div class="form-group full-width">
-          <label>Foto do Produto <span style="color:var(--text-3);font-weight:400">(opcional, máx. 5MB)</span></label>
+          <label>Foto do Produto / Tabela Nutricional <span style="color:var(--text-3);font-weight:400">(opcional)</span></label>
           <div class="photo-upload-wrapper" id="photo-upload-area">
-            <input class="photo-input" type="file" id="f-photo" accept="image/jpeg,image/png,image/webp">
-            <span class="photo-upload-label" id="photo-label">📸 Clique para adicionar uma foto</span>
+            <input class="photo-input" type="file" id="f-photo" accept="image/*">
+            <span class="photo-upload-label" id="photo-label">📸 Tirar foto com a câmera ou escolher da galeria</span>
             <img class="photo-preview-img" id="photo-preview" alt="Preview da foto">
           </div>
         </div>
@@ -219,7 +220,7 @@ function renderAddSection(user) {
         <!-- Ações -->
         <div class="form-actions">
           <button type="submit" class="btn-primary" id="btn-submit">
-            🚀 Adicionar ao Ranking
+            ${user ? '🚀 Adicionar ao Ranking Global' : '💾 Salvar no Meu Ranking'}
           </button>
         </div>
 
@@ -227,6 +228,7 @@ function renderAddSection(user) {
     </form>
   `
 
+  document.getElementById('btn-quick-login')?.addEventListener('click', () => signInWithGoogle())
   setupFormEvents()
 }
 
@@ -331,6 +333,8 @@ async function handleFormSubmit(e) {
     return
   }
 
+  const precoPorGrama = calcularPrecoPorGrama(preco, peso, porcao, proteina)
+
   // UI: loading state
   const btn = document.getElementById('btn-submit')
   if (btn) {
@@ -339,7 +343,36 @@ async function handleFormSubmit(e) {
   }
 
   try {
-    // Garante que o token/sessão do Supabase está ativo antes de tentar gravar
+    // 1. USUÁRIO NÃO LOGADO: Salva no LocalStorage (Meu Ranking)
+    if (!state.user) {
+      const res = saveLocalProduct({
+        name,
+        brand,
+        food_type: type,
+        price: preco,
+        weight_g: peso,
+        portion_g: porcao,
+        protein_g: proteina,
+        price_per_g_protein: precoPorGrama,
+        store_name: state.location?.placeName ?? null,
+        city: state.location?.city ?? null,
+        latitude: state.location?.lat ?? null,
+        longitude: state.location?.lng ?? null,
+      })
+
+      if (res.duplicated) {
+        showToast('Este produto já está cadastrado no seu ranking!', 'error')
+        return
+      }
+
+      showToast('Salvo no seu ranking pessoal! 🎉', 'success')
+      resetFormUI()
+      switchTab('personal')
+      await loadPersonalRanking()
+      return
+    }
+
+    // 2. USUÁRIO LOGADO: Salva no Supabase (Ranking Global + Nuvem)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) {
       showToast('Sessão expirada. Faça login novamente.', 'error')
@@ -372,29 +405,11 @@ async function handleFormSubmit(e) {
       longitude: state.location?.lng ?? null,
     })
 
-    showToast('Produto adicionado ao ranking! 🎉', 'success')
+    showToast('Produto adicionado ao ranking global! 🎉', 'success')
+    resetFormUI()
 
-    // Reset do formulário e estado
-    document.getElementById('product-form').reset()
-    state.photoFile = null
-    state.location  = null
-    resetMapModal()
-
-    const preview = document.getElementById('photo-preview')
-    const label   = document.getElementById('photo-label')
-    if (preview) { preview.src = ''; preview.style.display = 'none' }
-    if (label)   { label.style.display = 'block' }
-
-    const locBtn  = document.getElementById('btn-add-location')
-    const locText = document.getElementById('location-text')
-    if (locBtn)  { locBtn.classList.remove('has-location') }
-    if (locText) { locText.textContent = 'Selecionar local no mapa' }
-
-    const calcWrapper = document.getElementById('calc-preview-wrapper')
-    if (calcWrapper) calcWrapper.style.display = 'none'
-
-    // Recarrega listas
-    await Promise.all([loadRanking(), loadMyProducts()])
+    // Recarrega listas e mapas
+    await Promise.all([loadRanking(), loadMyProducts(), loadGlobalMap(), loadPersonalRanking()])
 
     // Scroll suave para o ranking
     setTimeout(() => {
@@ -413,9 +428,29 @@ async function handleFormSubmit(e) {
   } finally {
     if (btn) {
       btn.disabled = false
-      btn.textContent = '🚀 Adicionar ao Ranking'
+      btn.textContent = state.user ? '🚀 Adicionar ao Ranking Global' : '💾 Salvar no Meu Ranking'
     }
   }
+}
+
+function resetFormUI() {
+  document.getElementById('product-form')?.reset()
+  state.photoFile = null
+  state.location  = null
+  resetMapModal()
+
+  const preview = document.getElementById('photo-preview')
+  const label   = document.getElementById('photo-label')
+  if (preview) { preview.src = ''; preview.style.display = 'none' }
+  if (label)   { label.style.display = 'block' }
+
+  const locBtn  = document.getElementById('btn-add-location')
+  const locText = document.getElementById('location-text')
+  if (locBtn)  { locBtn.classList.remove('has-location') }
+  if (locText) { locText.textContent = 'Selecionar local no mapa' }
+
+  const calcWrapper = document.getElementById('calc-preview-wrapper')
+  if (calcWrapper) calcWrapper.style.display = 'none'
 }
 
 
@@ -508,6 +543,228 @@ async function loadStats() {
 }
 
 // ============================================================
+// MAPA GLOBAL (Últimos 100 pins)
+// ============================================================
+
+async function loadGlobalMap() {
+  try {
+    const pins = await getLatestPins(100)
+    await initGlobalMap('global-map-container', pins)
+  } catch (err) {
+    console.warn('[GlobalMap] Erro ao carregar pins:', err)
+  }
+}
+
+// ============================================================
+// ABAS DE RANKING & MEU RANKING
+// ============================================================
+
+function setupTabs() {
+  document.getElementById('tab-global')?.addEventListener('click', () => switchTab('global'))
+  document.getElementById('tab-personal')?.addEventListener('click', () => switchTab('personal'))
+}
+
+function switchTab(tabName) {
+  state.activeTab = tabName
+
+  const tabGlobal = document.getElementById('tab-global')
+  const tabPersonal = document.getElementById('tab-personal')
+  const globalView = document.getElementById('ranking-container')
+  const personalView = document.getElementById('my-ranking-container')
+
+  if (tabName === 'global') {
+    tabGlobal?.classList.add('active')
+    tabPersonal?.classList.remove('active')
+    globalView?.classList.remove('hidden')
+    personalView?.classList.add('hidden')
+    loadRanking()
+  } else {
+    tabGlobal?.classList.remove('active')
+    tabPersonal?.classList.add('active')
+    globalView?.classList.add('hidden')
+    personalView?.classList.remove('hidden')
+    loadPersonalRanking()
+  }
+}
+
+async function loadPersonalRanking() {
+  const container = document.getElementById('my-ranking-container')
+  if (!container) return
+
+  // 1. Obtém os produtos locais do LocalStorage
+  const localProducts = getLocalProducts()
+
+  // Atualiza badge de contagem
+  const badge = document.getElementById('local-count-badge')
+  if (badge) {
+    if (localProducts.length > 0) {
+      badge.textContent = localProducts.length
+      badge.classList.remove('hidden')
+    } else {
+      badge.classList.add('hidden')
+    }
+  }
+
+  // Se o usuário estiver logado, mescla com os produtos salvos na conta dele
+  let allPersonal = [...localProducts]
+
+  if (state.user) {
+    try {
+      const remoteProducts = await getMyProducts(state.user.id)
+      // Evita duplicar se já foi sincronizado
+      remoteProducts.forEach(remote => {
+        const alreadyIn = allPersonal.some(p =>
+          p.name.trim().toLowerCase() === remote.name.trim().toLowerCase() &&
+          Math.abs(Number(p.price) - Number(remote.price)) < 0.01
+        )
+        if (!alreadyIn) {
+          allPersonal.push({ ...remote, is_local: false })
+        }
+      })
+    } catch (err) {
+      console.warn('[PersonalRanking] Erro ao carregar remotos:', err)
+    }
+  }
+
+  // Ordena pelo menor preço por grama
+  allPersonal.sort((a, b) => Number(a.price_per_g_protein) - Number(b.price_per_g_protein))
+
+  // Filtra por tipo (all, animal, vegetal)
+  if (state.filter && state.filter !== 'all') {
+    allPersonal = allPersonal.filter(p => p.food_type === state.filter)
+  }
+
+  renderPersonalRankingList(container, allPersonal, async (productId, photoUrl) => {
+    if (productId.startsWith('local_')) {
+      deleteLocalProduct(productId)
+      showToast('Item local removido.', 'info')
+    } else {
+      await deleteProduct(productId, photoUrl)
+      showToast('Produto removido da nuvem.', 'info')
+      await loadMyProducts()
+    }
+    await Promise.all([loadPersonalRanking(), loadRanking()])
+    checkSyncBanner()
+  })
+}
+
+// ============================================================
+// SINCRONIZAÇÃO LOCALSTORAGE -> SUPABASE
+// ============================================================
+
+function checkSyncBanner() {
+  const bannerContainer = document.getElementById('sync-banner-container')
+  if (!bannerContainer) return
+
+  const localItems = getLocalProducts()
+
+  // Só exibe o banner se o usuário estiver logado e houver itens locais a sincronizar
+  if (state.user && localItems.length > 0) {
+    bannerContainer.innerHTML = `
+      <div class="sync-banner">
+        <div class="sync-banner-text">
+          🔄 Você tem <strong>${localItems.length} produto(s)</strong> no seu dispositivo. Deseja sincronizá-los com sua conta na nuvem?
+        </div>
+        <div class="sync-banner-actions">
+          <button class="btn-primary" id="btn-sync-now" style="padding:6px 14px;font-size:0.82rem">Sincronizar Agora</button>
+          <button class="btn-ghost" id="btn-sync-dismiss" style="padding:6px 12px;font-size:0.82rem">Descartar Locais</button>
+        </div>
+      </div>
+    `
+
+    document.getElementById('btn-sync-now')?.addEventListener('click', () => syncLocalToSupabase())
+    document.getElementById('btn-sync-dismiss')?.addEventListener('click', () => {
+      clearLocalProducts()
+      bannerContainer.innerHTML = ''
+      loadPersonalRanking()
+      showToast('Produtos locais descartados.', 'info')
+    })
+  } else {
+    bannerContainer.innerHTML = ''
+  }
+}
+
+async function syncLocalToSupabase() {
+  const localItems = getLocalProducts()
+  if (!localItems.length || !state.user) return
+
+  const syncBtn = document.getElementById('btn-sync-now')
+  if (syncBtn) {
+    syncBtn.disabled = true
+    syncBtn.textContent = 'Sincronizando...'
+  }
+
+  try {
+    let syncedCount = 0
+
+    // Pega produtos remotos existentes para aplicar regra anti-duplicidade na nuvem
+    const remoteProducts = await getMyProducts(state.user.id)
+
+    for (const item of localItems) {
+      const isAlreadySaved = remoteProducts.some(r =>
+        r.name.trim().toLowerCase() === item.name.trim().toLowerCase() &&
+        Math.abs(Number(r.price) - Number(item.price)) < 0.01 &&
+        Math.abs(Number(r.weight_g) - Number(item.weight_g)) < 0.01
+      )
+
+      if (!isAlreadySaved) {
+        await saveProduct({
+          userId:    state.user.id,
+          name:      item.name,
+          foodType:  item.food_type,
+          brand:     item.brand,
+          price:     item.price,
+          weightG:   item.weight_g,
+          portionG:  item.portion_g,
+          proteinG:  item.protein_g,
+          storeName: item.store_name,
+          city:      item.city,
+          latitude:  item.latitude,
+          longitude: item.longitude,
+        })
+        syncedCount++
+      }
+    }
+
+    clearLocalProducts()
+    showToast(`${syncedCount} produto(s) sincronizado(s) com sucesso! 🎉`, 'success')
+
+    document.getElementById('sync-banner-container').innerHTML = ''
+    await Promise.all([loadRanking(), loadMyProducts(), loadPersonalRanking(), loadGlobalMap()])
+
+  } catch (err) {
+    console.error('[Sync]', err)
+    showToast('Erro ao sincronizar produtos. Tente novamente.', 'error')
+    if (syncBtn) {
+      syncBtn.disabled = false
+      syncBtn.textContent = 'Sincronizar Agora'
+    }
+  }
+}
+
+// ============================================================
+// BOTÃO FLUTUANTE MÓVEL (+)
+// ============================================================
+
+function setupMobileFab() {
+  const fab = document.getElementById('mobile-fab')
+  if (!fab) return
+
+  fab.addEventListener('click', () => {
+    const addSection = document.getElementById('section-add')
+    if (addSection) {
+      addSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      // Foca no primeiro input para agilizar digitação no mobile
+      setTimeout(() => {
+        document.getElementById('f-name')?.focus()
+      }, 400)
+    }
+  })
+}
+
+
+
+// ============================================================
 // FILTROS DO RANKING
 // ============================================================
 
@@ -517,7 +774,11 @@ function setupFilters() {
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
       btn.classList.add('active')
       state.filter = btn.getAttribute('data-filter')
-      await loadRanking()
+      if (state.activeTab === 'global') {
+        await loadRanking()
+      } else {
+        await loadPersonalRanking()
+      }
     })
   })
 }
@@ -545,8 +806,6 @@ function setupGlobalEvents() {
     if (e.key === 'Escape') closeMapModal()
   })
 }
-
-
 
 // ============================================================
 // START
