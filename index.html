@@ -279,7 +279,13 @@
       <div id="map" style="height:380px;border-radius:12px;overflow:hidden"></div>
       <div class="modal-footer">
         <div id="selected-location-display" class="selected-location-text"></div>
-        <button class="btn-primary" id="btn-confirm-location" data-i18n="btnConfirmLocation">Confirmar Local</button>
+        <div class="modal-footer-actions">
+          <button type="button" class="btn-modal-gps" id="btn-modal-my-location" title="Usar minha localização GPS atual">
+            <span class="gps-icon">📍</span>
+            <span data-i18n="btnModalMyLocation">Meu local</span>
+          </button>
+          <button type="button" class="btn-primary" id="btn-confirm-location" data-i18n="btnConfirmLocation">Confirmar Local</button>
+        </div>
       </div>
     </div>
   </div>

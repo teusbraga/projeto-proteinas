@@ -274,11 +274,12 @@ export async function initMap(mapContainerId, geocoderContainerId) {
   const geocoder = new MapboxGeocoder({
     accessToken: TOKEN,
     mapboxgl,
-    placeholder: lang === 'en' ? 'Search grocery store, pharmacy, address...' : 'Buscar mercado, farmácia, endereço...',
+    placeholder: lang === 'en' ? 'Search grocery store, pharmacy, address...' : 'Buscar mercado, farmácia, loja, endereço...',
     language: lang === 'en' ? 'en' : 'pt-BR',
     country: lang === 'en' ? undefined : 'BR',
     types: 'poi,address,place,locality,neighborhood',
     trackProximity: true,
+    externalGeocoder: searchOpenStreetMapPOIs,
   })
 
   // Tenta usar a geolocalização do usuário para centrar o mapa e orientar a busca
@@ -332,6 +333,38 @@ export async function initMap(mapContainerId, geocoderContainerId) {
 /** Redimensiona o mapa para o container atual (corrige renderização ao reabrir modal). */
 export function resizeMap() {
   map?.resize()
+}
+
+/**
+ * Obtém a localização GPS atual do usuário, centraliza o mapa com zoom e define o marcador.
+ *
+ * @returns {Promise<{lng: number, lat: number, placeName: string, city: string|null}>}
+ */
+export async function setUserLocationOnMap() {
+  if (!navigator.geolocation) {
+    throw new Error('Geolocalização não suportada pelo navegador')
+  }
+
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const lng = coords.longitude
+          const lat = coords.latitude
+          if (map) {
+            map.flyTo({ center: [lng, lat], zoom: 16 })
+          }
+          const { placeName, city } = await reverseGeocode(lng, lat)
+          setMarker(lng, lat, placeName, city)
+          resolve({ lng, lat, placeName, city })
+        } catch (err) {
+          reject(err)
+        }
+      },
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    )
+  })
 }
 
 /** Destrói o mapa e libera recursos. Chamar ao fechar o modal. */
@@ -390,5 +423,64 @@ async function reverseGeocode(lng, lat) {
     return { placeName, city }
   } catch {
     return { placeName: `${lat.toFixed(5)}, ${lng.toFixed(5)}`, city: null }
+  }
+}
+
+/**
+ * Busca estabelecimentos comerciais e pontos de interesse (mercados, padarias, farmácias)
+ * no OpenStreetMap (via Photon) para complementar os resultados da Mapbox.
+ * Totalmente gratuito, sem necessidade de chaves e com proteção por timeout.
+ */
+async function searchOpenStreetMapPOIs(query) {
+  if (!query || query.trim().length < 3) return []
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 3500)
+
+    const center = map ? map.getCenter() : { lng: -46.6333, lat: -23.5505 }
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query.trim())}&lat=${center.lat}&lon=${center.lng}&limit=5`
+
+    const res = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeoutId)
+
+    if (!res.ok) return []
+    const data = await res.json()
+    if (!data.features || !Array.isArray(data.features)) return []
+
+    return data.features.map(f => {
+      const p = f.properties || {}
+      const street = p.street ? (p.housenumber ? `${p.street}, ${p.housenumber}` : p.street) : ''
+      const district = p.district || p.locality || ''
+      const city = p.city || p.town || p.municipality || ''
+      const state = p.state || ''
+
+      const parts = [
+        p.name,
+        street,
+        district,
+        city ? (state ? `${city} - ${state}` : city) : state
+      ].filter(Boolean)
+
+      const place_name = parts.length > 0 ? parts.join(', ') : (p.name || query)
+
+      return {
+        id: `osm.${p.osm_type || 'N'}${p.osm_id || Math.floor(Math.random() * 100000)}`,
+        type: 'Feature',
+        text: p.name || p.street || query,
+        place_name,
+        place_type: ['poi'],
+        center: f.geometry.coordinates,
+        geometry: f.geometry,
+        context: [
+          district ? { id: 'neighborhood.osm', text: district } : null,
+          city ? { id: 'place.osm', text: city } : null,
+          state ? { id: 'region.osm', text: state } : null,
+          { id: 'country.osm', text: 'Brasil' }
+        ].filter(Boolean)
+      }
+    })
+  } catch {
+    return [] // Se a requisição falhar ou der timeout, retorna lista vazia sem travar
   }
 }

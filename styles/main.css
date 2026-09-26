@@ -1673,6 +1673,44 @@ body::before {
 
 .selected-location-text { font-size: 0.85rem; color: var(--text-2); font-weight: 600; flex: 1; }
 
+.modal-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-modal-gps {
+  background: var(--surface, #ffffff);
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 1.1rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.btn-modal-gps:hover {
+  background: var(--bg-subtle);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.btn-modal-gps:active {
+  transform: translateY(1px);
+}
+
+.btn-modal-gps.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
 /* Container e sugestões do buscador de estabelecimentos (Geocoder) */
 #geocoder-container {
   position: relative;
@@ -2328,7 +2366,27 @@ body.drawer-open-lock {
     min-height: 240px;
   }
 
-  .modal-footer { flex-direction: column; align-items: stretch; gap: 10px; }
+  .modal-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .modal-footer-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .modal-footer-actions .btn-modal-gps,
+  .modal-footer-actions .btn-primary {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+  }
+
   #toast-container { right: 12px; bottom: 12px; left: 12px; }
   .toast { min-width: 0; }
 

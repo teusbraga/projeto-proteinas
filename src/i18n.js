@@ -123,6 +123,8 @@ export const translations = {
     // Modal de Mapa
     modalMapTitle: '📍 Onde você viu esse produto?',
     btnConfirmLocation: 'Confirmar Local',
+    btnModalMyLocation: 'Meu local',
+    btnModalMyLocationLoading: 'Obtendo GPS...',
 
     // Validações e Toasts
     valRequiredNumbers: 'Todos os campos numéricos devem ser maiores que zero.',
@@ -139,6 +141,7 @@ export const translations = {
     toastDeleteSuccess: 'Produto removido com sucesso.',
     toastDeleteError: 'Erro ao remover produto.',
     toastGpsDenied: 'Não foi possível obter sua localização GPS.',
+    toastLocationFound: 'Localização detectada via GPS!',
 
     // Footer
     footerText: '💪 ProteinPrice — feito pela comunidade, para a comunidade',
@@ -260,6 +263,8 @@ export const translations = {
     // Modal de Mapa
     modalMapTitle: '📍 Where did you find this product?',
     btnConfirmLocation: 'Confirm Location',
+    btnModalMyLocation: 'My location',
+    btnModalMyLocationLoading: 'Getting GPS...',
 
     // Validações e Toasts
     valRequiredNumbers: 'All numeric fields must be greater than zero.',
@@ -276,6 +281,7 @@ export const translations = {
     toastDeleteSuccess: 'Product deleted successfully.',
     toastDeleteError: 'Error deleting product.',
     toastGpsDenied: 'Could not access your GPS location.',
+    toastLocationFound: 'Location detected via GPS!',
 
     // Footer
     footerText: '💪 ProteinPrice — built by the community, for the community',

@@ -1,4 +1,6 @@
-import { initMap, destroyMap, getSelectedLocation, resizeMap } from '../map.js'
+import { initMap, destroyMap, getSelectedLocation, resizeMap, setUserLocationOnMap } from '../map.js'
+import { showToast } from './toast.js'
+import { t } from '../i18n.js'
 
 let mapInitialized = false
 
@@ -24,6 +26,27 @@ export function openMapModal(onConfirm) {
     setTimeout(() => {
       resizeMap()
     }, 60)
+  }
+
+  // Botão "Meu local" — obtém o GPS do usuário, centraliza o mapa e define o marcador
+  const btnMyLocation = document.getElementById('btn-modal-my-location')
+  if (btnMyLocation) {
+    const newGpsBtn = btnMyLocation.cloneNode(true)
+    btnMyLocation.parentNode.replaceChild(newGpsBtn, btnMyLocation)
+    newGpsBtn.addEventListener('click', async () => {
+      newGpsBtn.classList.add('loading')
+      const originalHtml = newGpsBtn.innerHTML
+      newGpsBtn.innerHTML = `<span>⏳</span><span>${t('btnModalMyLocationLoading') || 'Obtendo GPS...'}</span>`
+      try {
+        await setUserLocationOnMap()
+        showToast(t('toastLocationFound') || 'Localização detectada via GPS!', 'success')
+      } catch (err) {
+        showToast(t('toastGpsDenied') || 'Não foi possível obter sua localização GPS.', 'error')
+      } finally {
+        newGpsBtn.classList.remove('loading')
+        newGpsBtn.innerHTML = originalHtml
+      }
+    })
   }
 
   // Trocar o listener do botão confirmar a cada abertura (evita múltiplos listeners)
