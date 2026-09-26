@@ -31,6 +31,7 @@ const state = {
   filter:          'all',   // 'all' | 'animal' | 'vegetal'
   currency:        'BRL',   // 'BRL' | 'USD' | 'EUR' | 'all'
   city:            'all',   // 'all' | string
+  cityCoords:      null,    // [lng, lat] | null
   userCoords:      null,    // { lat, lng } | null
   radiusKm:        25,      // raio padrão em km
   proximityActive: false,   // boolean
@@ -685,7 +686,7 @@ async function loadStats(currency = state.currency) {
 
 async function loadGlobalMap(city = state.city, coords = null) {
   try {
-    const pins = await getLatestPins(100, city)
+    const pins = await getLatestPins(100, city, state.currency)
     await initGlobalMap('global-map-container', pins, coords)
   } catch (err) {
     console.warn('[GlobalMap] Erro ao carregar pins:', err)
@@ -998,7 +999,36 @@ function setupFilters() {
   const currencySelect = document.getElementById('filter-currency')
   currencySelect?.addEventListener('change', async (e) => {
     state.currency = e.target.value
-    await Promise.all([reloadActiveRanking(), loadStats(state.currency)])
+  })
+
+  // Botão Buscar
+  document.getElementById('btn-search-filters')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget
+    
+    // Se o usuário digitou mas não selecionou, pegamos o valor do input
+    const cityInput = document.getElementById('filter-city')?.value.trim()
+    if (!cityInput) {
+      state.city = 'all'
+      state.cityCoords = null
+    } else if (state.city === 'all' || !cityInput.toLowerCase().includes(state.city.toLowerCase())) {
+      state.city = cleanCityName(cityInput)
+      state.cityCoords = null
+    }
+
+    if (btn) {
+      const originalText = btn.innerHTML
+      btn.innerHTML = '<span>⏳</span><span>Buscando...</span>'
+      btn.disabled = true
+      
+      await Promise.all([
+        reloadActiveRanking(),
+        loadStats(state.currency),
+        loadGlobalMap(state.city, state.cityCoords)
+      ])
+      
+      btn.innerHTML = originalText
+      btn.disabled = false
+    }
   })
 
   // Filtro de Cidade — autocomplete via Mapbox Geocoding API
@@ -1103,10 +1133,9 @@ function setupCityAutocomplete() {
   clearBtn?.addEventListener('click', () => {
     input.value = ''
     state.city = 'all'
+    state.cityCoords = null
     clearBtn.classList.add('hidden')
     hideSuggestions()
-    reloadActiveRanking()
-    loadGlobalMap('all')
   })
 
   input.addEventListener('input', () => {
@@ -1118,8 +1147,7 @@ function setupCityAutocomplete() {
     } else {
       clearBtn?.classList.add('hidden')
       state.city = 'all'
-      reloadActiveRanking()
-      loadGlobalMap('all')
+      state.cityCoords = null
       hideSuggestions()
       return
     }
@@ -1167,9 +1195,8 @@ function setupCityAutocomplete() {
         const query = input.value.trim()
         if (query) {
           state.city = cleanCityName(query)
+          state.cityCoords = null
           hideSuggestions()
-          reloadActiveRanking()
-          loadGlobalMap(state.city)
         }
       }
     } else if (e.key === 'Escape') {
@@ -1204,13 +1231,9 @@ function setupCityAutocomplete() {
         const clean = cleanCityName(cityName)
         input.value = feature.place_name
         state.city = clean
+        state.cityCoords = feature.center // [lng, lat]
         hideSuggestions()
         clearBtn?.classList.remove('hidden')
-        reloadActiveRanking()
-
-        // Sincroniza o mapa com as coordenadas da cidade selecionada
-        const coords = feature.center // [lng, lat]
-        loadGlobalMap(state.city, coords)
       })
       suggestionsList.appendChild(li)
     })

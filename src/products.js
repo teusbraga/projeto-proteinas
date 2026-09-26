@@ -211,7 +211,7 @@ export async function getAvailableCities() {
  * Busca os últimos 100 alfinetes/pontos geográficos no mapa global.
  * @returns {Promise<Array<Object>>}
  */
-export async function getLatestPins(limit = 100, city = null) {
+export async function getLatestPins(limit = 100, city = null, currency = 'BRL') {
   const runQuery = async (includeCurrencyColumn = true) => {
     const fields = includeCurrencyColumn
       ? 'id, store_name, city, latitude, longitude, name, price_per_g_protein, currency, created_at'
@@ -229,6 +229,10 @@ export async function getLatestPins(limit = 100, city = null) {
       if (clean && clean !== 'all') {
         query = query.ilike('city', `%${clean}%`)
       }
+    }
+
+    if (includeCurrencyColumn && currency && currency !== 'all') {
+      query = query.eq('currency', currency.toUpperCase())
     }
 
     return await query
