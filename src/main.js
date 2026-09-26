@@ -38,13 +38,13 @@ async function init() {
   setupFilters()
 
   // Ouve mudanças de autenticação — dispara imediatamente com estado atual
-  // e também processa automaticamente o callback OAuth do Google
+  // e também processa automaticamente o callback OAuth do Google (PKCE ou Hash)
   onAuthChange(async (user) => {
     state.user = user
 
-    // Remove qualquer '#' ou parâmetros de token da barra de endereço
-    if (window.location.hash) {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    // Limpa qualquer vestígio de autenticação (?code=... ou #...) mantendo a URL 100% limpa
+    if (window.location.hash || window.location.search.includes('code=')) {
+      window.history.replaceState(null, '', window.location.pathname)
     }
 
     renderAuthWidget(user)

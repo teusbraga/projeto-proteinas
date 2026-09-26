@@ -10,5 +10,12 @@ if (!supabaseUrl || !supabaseKey) {
   )
 }
 
-// Singleton — uma única instância para toda a aplicação
-export const supabase = createClient(supabaseUrl, supabaseKey)
+// Singleton — uma única instância para toda a aplicação configurada com PKCE
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    flowType: 'pkce',
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    persistSession: true,
+  },
+})
