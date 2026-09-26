@@ -33,7 +33,15 @@
       </div>
 
       <nav class="header-nav">
-        <button class="btn-ghost" id="btn-scroll-ranking">🏆 Ranking</button>
+        <button class="btn-ghost" id="btn-scroll-ranking" data-i18n="navRanking">🏆 Ranking</button>
+        <!-- Alternador de Tema Claro/Escuro -->
+        <button class="btn-icon" id="btn-theme-toggle" type="button" aria-label="Alternar tema" title="Alternar tema">
+          <span id="theme-toggle-icon">🌙</span>
+        </button>
+        <!-- Alternador de Idioma (PT / EN) -->
+        <button class="btn-lang" id="btn-lang-toggle" type="button" aria-label="Change language" title="Switch language">
+          <span class="lang-flag">🇺🇸</span> <span class="lang-code">EN</span>
+        </button>
         <div id="auth-widget">
           <!-- Preenchido pelo JS no Desktop -->
         </div>
@@ -61,30 +69,42 @@
       <!-- Preenchido pelo JS -->
     </div>
 
+    <!-- Controles Rápidos: Tema e Idioma no Mobile -->
+    <div class="drawer-controls">
+      <button class="btn-drawer-control" id="btn-drawer-theme" type="button" aria-label="Alternar tema">
+        <span class="control-icon" id="drawer-theme-icon">🌙</span>
+        <span id="drawer-theme-text" data-i18n="themeTextDark">Modo Escuro</span>
+      </button>
+      <button class="btn-drawer-control" id="btn-drawer-lang" type="button" aria-label="Change language">
+        <span class="control-icon" id="drawer-lang-icon">🇺🇸</span>
+        <span id="drawer-lang-text">English</span>
+      </button>
+    </div>
+
     <!-- Navegação rápida no Drawer -->
     <nav class="drawer-nav">
       <button class="drawer-nav-item" id="drawer-nav-ranking">
         <span class="drawer-nav-icon">🏆</span>
-        <span class="drawer-nav-text">Ranking Global</span>
+        <span class="drawer-nav-text" data-i18n="drawerRanking">Ranking Global</span>
       </button>
       <button class="drawer-nav-item" id="drawer-nav-personal">
         <span class="drawer-nav-icon">👤</span>
-        <span class="drawer-nav-text">Meu Ranking Pessoal</span>
+        <span class="drawer-nav-text" data-i18n="drawerPersonal">Meu Ranking Pessoal</span>
         <span id="drawer-badge-personal" class="badge-count hidden">0</span>
       </button>
       <button class="drawer-nav-item" id="drawer-nav-map">
         <span class="drawer-nav-icon">🗺️</span>
-        <span class="drawer-nav-text">Mapa Comunitário</span>
+        <span class="drawer-nav-text" data-i18n="drawerMap">Mapa Comunitário</span>
       </button>
       <button class="drawer-nav-item highlight" id="drawer-nav-add">
         <span class="drawer-nav-icon">➕</span>
-        <span class="drawer-nav-text">Adicionar Alimento</span>
+        <span class="drawer-nav-text" data-i18n="drawerAdd">Adicionar Alimento</span>
       </button>
     </nav>
 
     <div class="drawer-footer">
-      <div class="drawer-footer-version">ProteinPrice v1.1</div>
-      <div class="drawer-footer-desc">A proteína mais barata da sua cidade</div>
+      <div class="drawer-footer-version">ProteinPrice v1.3</div>
+      <div class="drawer-footer-desc" data-i18n="brandDesc">A proteína mais barata da sua cidade</div>
     </div>
   </aside>
 
@@ -94,12 +114,12 @@
     <section class="hero" id="hero">
       <div class="container">
         <div class="hero-content">
-          <div class="hero-badge">🔬 Calculadora de Custo-Benefício</div>
-          <h1 class="hero-title">
-            Quanto custa cada grama de
-            <span class="hero-highlight">proteína</span>?
+          <div class="hero-badge" data-i18n="heroBadge">🔬 Calculadora de Custo-Benefício</div>
+          <h1 class="hero-title" id="hero-title">
+            <span data-i18n="heroTitlePre">Quanto custa cada grama de</span>
+            <span class="hero-highlight" data-i18n="heroTitleHighlight">proteína</span><span data-i18n="heroTitlePost">?</span>
           </h1>
-          <p class="hero-subtitle">
+          <p class="hero-subtitle" data-i18n="heroSubtitle">
             Calcule, compare e compartilhe o custo-benefício de qualquer alimento.
             Juntos, encontramos o melhor preço da cidade.
           </p>
@@ -138,8 +158,8 @@
       <div class="container">
         <div class="section-header-row">
           <div>
-            <h2 class="section-title">🗺️ Mapa Comunitário de Proteínas</h2>
-            <p class="section-subtitle">Últimos pontos de compra cadastrados pela comunidade</p>
+            <h2 class="section-title" data-i18n="globalMapTitle">🗺️ Mapa Comunitário de Proteínas</h2>
+            <p class="section-subtitle" data-i18n="globalMapSubtitle">Últimos pontos de compra cadastrados pela comunidade</p>
           </div>
         </div>
         <div class="global-map-card">
@@ -154,40 +174,41 @@
         <div class="ranking-navigation">
           <div class="tab-controls">
             <button class="tab-btn active" id="tab-global" data-tab="global">
-              🌍 Ranking Global
+              <span data-i18n="tabGlobal">🌍 Ranking Global</span>
             </button>
             <button class="tab-btn" id="tab-personal" data-tab="personal">
-              👤 Meu Ranking <span id="local-count-badge" class="badge-count hidden">0</span>
+              <span data-i18n="tabPersonal">👤 Meu Ranking</span> <span id="local-count-badge" class="badge-count hidden">0</span>
             </button>
           </div>
           
           <div class="ranking-filters" role="group" aria-label="Filtros de tipo" id="ranking-type-filters">
-            <button class="filter-btn active" data-filter="all" id="filter-all">Todos</button>
-            <button class="filter-btn" data-filter="animal" id="filter-animal">🥩 Animal</button>
-            <button class="filter-btn" data-filter="vegetal" id="filter-vegetal">🌱 Vegetal</button>
+            <button class="filter-btn active" data-filter="all" id="filter-all" data-i18n="filterAll">Todos</button>
+            <button class="filter-btn" data-filter="animal" id="filter-animal" data-i18n="filterAnimal">🥩 Animal</button>
+            <button class="filter-btn" data-filter="vegetal" id="filter-vegetal" data-i18n="filterVegetal">🌱 Vegetal</button>
           </div>
         </div>
 
         <!-- Toolbar de Filtros Avançados: Moeda, Cidade e Raio KM -->
         <div class="filter-toolbar" id="filter-toolbar" aria-label="Filtros por localidade e moeda">
           <div class="filter-group">
-            <label for="filter-currency" class="filter-label">💰 Moeda:</label>
+            <label for="filter-currency" class="filter-label" data-i18n="filterCurrencyLabel">💰 Moeda:</label>
             <select id="filter-currency" class="filter-select">
               <option value="BRL" selected>🇧🇷 BRL (R$)</option>
               <option value="USD">🇺🇸 USD ($)</option>
               <option value="EUR">🇪🇺 EUR (€)</option>
-              <option value="all">Todas as Moedas</option>
+              <option value="all" data-i18n="filterCurrencyAll">Todas as Moedas</option>
             </select>
           </div>
 
           <div class="filter-group filter-city-group">
-            <label for="filter-city" class="filter-label">🏙️ Cidade:</label>
+            <label for="filter-city" class="filter-label" data-i18n="filterCityLabel">🏙️ Cidade:</label>
             <div class="city-autocomplete-wrapper">
               <input
                 type="text"
                 id="filter-city"
                 class="filter-input"
                 placeholder="Ex: São Paulo, SP"
+                data-i18n-placeholder="filterCityPlaceholder"
                 autocomplete="off"
                 aria-label="Filtrar por cidade"
               />
@@ -199,14 +220,14 @@
           <div class="filter-group filter-proximity-group">
             <button type="button" class="btn-proximity" id="btn-proximity" title="Usar minha localização GPS para filtrar por distância">
               <span class="proximity-icon">📍</span>
-              <span class="proximity-text">Perto de mim</span>
+              <span class="proximity-text" data-i18n="btnProximity">Perto de mim</span>
             </button>
             <select id="filter-radius" class="filter-select proximity-radius hidden" title="Raio de busca em quilômetros">
-              <option value="5">Raio: 5 km</option>
-              <option value="10">Raio: 10 km</option>
-              <option value="25" selected>Raio: 25 km</option>
-              <option value="50">Raio: 50 km</option>
-              <option value="100">Raio: 100 km</option>
+              <option value="5" data-i18n="radius5">Raio: 5 km</option>
+              <option value="10" data-i18n="radius10">Raio: 10 km</option>
+              <option value="25" selected data-i18n="radius25">Raio: 25 km</option>
+              <option value="50" data-i18n="radius50">Raio: 50 km</option>
+              <option value="100" data-i18n="radius100">Raio: 100 km</option>
             </select>
             <button type="button" class="btn-clear-proximity hidden" id="btn-clear-proximity" title="Remover filtro de proximidade" aria-label="Remover proximidade">✕</button>
           </div>
@@ -214,7 +235,7 @@
           <div class="filter-group filter-action-group">
             <button type="button" id="btn-search-filters" class="btn-primary" style="margin-top: auto; padding: 0.65rem 1.2rem; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px;">
               <span>🔍</span>
-              <span>Buscar</span>
+              <span data-i18n="btnSearch">Buscar</span>
             </button>
           </div>
         </div>
@@ -240,7 +261,7 @@
   <!-- ===================== FOOTER ===================== -->
   <footer class="footer">
     <div class="container">
-      <span>💪 ProteinPrice — feito pela comunidade, para a comunidade</span>
+      <span data-i18n="footerText">💪 ProteinPrice — feito pela comunidade, para a comunidade</span>
     </div>
   </footer>
 
@@ -248,14 +269,14 @@
   <div class="modal-overlay hidden" id="map-modal-overlay" role="dialog" aria-modal="true" aria-label="Selecionar local no mapa">
     <div class="modal" id="map-modal">
       <div class="modal-header">
-        <h3 class="modal-title">📍 Onde você viu esse produto?</h3>
+        <h3 class="modal-title" data-i18n="modalMapTitle">📍 Onde você viu esse produto?</h3>
         <button class="modal-close" id="btn-close-modal" aria-label="Fechar">&times;</button>
       </div>
       <div id="geocoder-container" style="margin-bottom:12px"></div>
       <div id="map" style="height:380px;border-radius:12px;overflow:hidden"></div>
       <div class="modal-footer">
         <div id="selected-location-display" class="selected-location-text"></div>
-        <button class="btn-primary" id="btn-confirm-location">Confirmar Local</button>
+        <button class="btn-primary" id="btn-confirm-location" data-i18n="btnConfirmLocation">Confirmar Local</button>
       </div>
     </div>
   </div>

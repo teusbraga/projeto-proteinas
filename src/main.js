@@ -2,12 +2,11 @@
  * main.js — Orquestrador central da aplicação ProteinPrice
  *
  * Responsabilidades:
- * 1. Inicializar autenticação e reagir a mudanças de sessão
- * 2. Renderizar o formulário (ou login prompt) dependendo do auth state
+ * 1. Inicializar tema (claro/escuro) e internacionalização (PT/EN)
+ * 2. Inicializar autenticação e reagir a mudanças de sessão
  * 3. Gerenciar o ciclo de vida do formulário: validação, compressão, submit
- * 4. Carregar e renderizar o ranking público
- * 5. Carregar e renderizar a lista pessoal do usuário
- * 6. Configurar modais, filtros e eventos globais
+ * 4. Carregar e renderizar o ranking público e lista pessoal
+ * 5. Configurar modais, filtros avançados, geolocalização e eventos globais
  */
 
 import { supabase } from './supabase.js'
@@ -18,8 +17,10 @@ import { openMapModal, closeMapModal, resetMapModal } from './ui/modal.js'
 import { showToast } from './ui/toast.js'
 import { renderRankingList, renderPersonalRankingList, renderMyProductsList } from './ui/ranking.js'
 import { compressImage, escapeHtml, googleIcon, calculateDistanceKm, cleanCityName } from './utils.js'
-import { initGlobalMap } from './map.js'
+import { initGlobalMap, updateMapTheme } from './map.js'
 import { getLocalProducts, saveLocalProduct, deleteLocalProduct, clearLocalProducts } from './localRanking.js'
+import { initTheme, toggleTheme, onThemeChange } from './theme.js'
+import { initI18n, toggleLanguage, onLanguageChange, t, getLanguage } from './i18n.js'
 
 // ============================================================
 // ESTADO GLOBAL DA APLICAÇÃO
@@ -44,17 +45,37 @@ const state = {
 // ============================================================
 
 async function init() {
+  // Inicializa preferências de Tema e Idioma salvas
+  initTheme()
+  initI18n()
+
+  // Sincroniza o estilo do Mapbox quando o tema mudar
+  onThemeChange((newTheme) => {
+    updateMapTheme(newTheme)
+  })
+
+  // Re-renderiza a interface dinamicamente quando o idioma mudar
+  onLanguageChange(async () => {
+    renderAuthWidget(state.user)
+    renderAddSection(state.user)
+    checkSyncBanner()
+    await Promise.all([
+      loadRanking(),
+      loadPersonalRanking(),
+      loadStats(state.currency),
+    ])
+  })
+
   setupGlobalEvents()
   setupFilters()
   setupTabs()
   setupMobileFab()
 
-  // Ouve mudanças de autenticação — dispara imediatamente com estado atual
-  // e também processa automaticamente o callback OAuth do Google (PKCE ou Hash)
+  // Ouve mudanças de autenticação
   onAuthChange(async (user) => {
     state.user = user
 
-    // Limpa qualquer vestígio de autenticação (?code=... ou #...) mantendo a URL 100% limpa
+    // Limpa parâmetros da URL de retorno do Google OAuth
     if (window.location.hash || window.location.search.includes('code=')) {
       window.history.replaceState(null, '', window.location.pathname)
     }
@@ -88,7 +109,6 @@ async function init() {
 }
 
 // ============================================================
-// ============================================================
 // AUTH WIDGET (header & mobile drawer)
 // ============================================================
 
@@ -111,13 +131,13 @@ function renderAuthWidget(user) {
         <div class="user-widget">
           ${avatar ? `<img class="avatar-img" src="${avatar}" alt="Avatar de ${firstName}" referrerpolicy="no-referrer">` : ''}
           <span class="avatar-name">${firstName}</span>
-          <button class="btn-ghost" id="btn-signout">Sair</button>
+          <button class="btn-ghost" id="btn-signout">${t('signOut')}</button>
         </div>
       `
       document.getElementById('btn-signout')?.addEventListener('click', handleSignOut)
     }
 
-    // 2. Mobile Top Bar Right (Avatar clicável que abre o menu lateral)
+    // 2. Mobile Top Bar Right
     if (mobileRight) {
       mobileRight.innerHTML = `
         <button class="btn-mobile-avatar" id="btn-mobile-avatar" aria-label="Abrir menu do perfil">
@@ -127,7 +147,7 @@ function renderAuthWidget(user) {
       document.getElementById('btn-mobile-avatar')?.addEventListener('click', openDrawer)
     }
 
-    // 3. Mobile Drawer (Perfil completo + Botão Sair espaçoso que não quebra o topo)
+    // 3. Mobile Drawer
     if (drawerAuth) {
       drawerAuth.innerHTML = `
         <div class="drawer-user-card">
@@ -139,11 +159,11 @@ function renderAuthWidget(user) {
           <div class="drawer-user-info">
             <div class="drawer-user-name">${escapeHtml(fullName)}</div>
             <div class="drawer-user-email">${escapeHtml(email)}</div>
-            <span class="drawer-user-badge">🟢 Conectado</span>
+            <span class="drawer-user-badge">${t('drawerConnected')}</span>
           </div>
         </div>
         <button class="btn-drawer-signout" id="btn-drawer-signout">
-          🚪 Sair da Conta
+          ${t('drawerSignOut')}
         </button>
       `
       document.getElementById('btn-drawer-signout')?.addEventListener('click', handleSignOut)
@@ -155,17 +175,17 @@ function renderAuthWidget(user) {
       widget.innerHTML = `
         <button class="btn-primary" id="btn-login-header">
           ${googleIcon()}
-          Entrar com Google
+          ${t('loginHeader')}
         </button>
       `
       document.getElementById('btn-login-header')?.addEventListener('click', () => signInWithGoogle())
     }
 
-    // 2. Mobile Top Bar Right (Botão Entrar discreto)
+    // 2. Mobile Top Bar Right
     if (mobileRight) {
       mobileRight.innerHTML = `
         <button class="btn-mobile-login" id="btn-mobile-login" aria-label="Fazer Login">
-          Entrar
+          ${t('loginMobile')}
         </button>
       `
       document.getElementById('btn-mobile-login')?.addEventListener('click', () => signInWithGoogle())
@@ -177,13 +197,13 @@ function renderAuthWidget(user) {
         <div class="drawer-guest-card">
           <div class="drawer-guest-icon">👋</div>
           <div class="drawer-guest-content">
-            <div class="drawer-guest-title">Modo Visitante</div>
-            <p class="drawer-guest-text">Faça login com Google para salvar seus produtos na nuvem e colaborar com o Ranking Global.</p>
+            <div class="drawer-guest-title">${t('drawerGuestTitle')}</div>
+            <p class="drawer-guest-text">${t('drawerGuestText')}</p>
           </div>
         </div>
         <button class="btn-primary btn-drawer-login" id="btn-drawer-login">
           ${googleIcon()}
-          Entrar com Google
+          ${t('loginHeader')}
         </button>
       `
       document.getElementById('btn-drawer-login')?.addEventListener('click', () => {
@@ -198,9 +218,9 @@ async function handleSignOut() {
   try {
     closeDrawer()
     await signOut()
-    showToast('Sessão encerrada.', 'info')
+    showToast(t('toastSignOutSuccess'), 'info')
   } catch {
-    showToast('Erro ao sair.', 'error')
+    showToast(t('toastSignOutError'), 'error')
   }
 }
 
@@ -212,20 +232,21 @@ function renderAddSection(user) {
   const card = document.getElementById('add-product-card')
   if (!card) return
 
-  // Reset de estado do formulário ao recarregar
   state.photoFile = null
   state.location = null
 
   const authNotice = !user
     ? `<div style="background:var(--primary-light);border:1px solid rgba(255,107,74,0.3);padding:10px 14px;border-radius:10px;font-size:0.85rem;color:var(--primary-dark);margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-         <span>💡 <strong>Modo Visitante:</strong> seus produtos serão salvos no <em>Meu Ranking</em> deste navegador. Faça login com o Google para publicar no Ranking Global!</span>
-         <button type="button" class="btn-primary" id="btn-quick-login" style="padding:4px 10px;font-size:0.75rem">Fazer Login</button>
+         <span>${t('formNoticeGuest')}</span>
+         <button type="button" class="btn-primary" id="btn-quick-login" style="padding:4px 10px;font-size:0.75rem">${t('formQuickLogin')}</button>
        </div>`
     : ''
 
+  const symbol = getCurrencySymbol(state.currency || 'BRL')
+
   card.innerHTML = `
     <div class="form-header-row">
-      <h2 class="form-title">➕ Adicionar Produto</h2>
+      <h2 class="form-title">${t('formTitle')}</h2>
       <button type="button" class="btn-close-product-modal" id="btn-close-product-modal" aria-label="Fechar formulário">&times;</button>
     </div>
     ${authNotice}
@@ -234,90 +255,90 @@ function renderAddSection(user) {
 
         <!-- Nome -->
         <div class="form-group">
-          <label for="f-name">Nome do Produto *</label>
-          <input type="text" id="f-name" placeholder="Ex: Peito de Frango" required maxlength="100" autocomplete="off">
+          <label for="f-name">${t('fNameLabel')}</label>
+          <input type="text" id="f-name" placeholder="${t('fNamePlaceholder')}" required maxlength="100" autocomplete="off">
         </div>
 
         <!-- Marca -->
         <div class="form-group">
-          <label for="f-brand">Marca</label>
-          <input type="text" id="f-brand" placeholder="Ex: Sadia" maxlength="60" autocomplete="off">
+          <label for="f-brand">${t('fBrandLabel')}</label>
+          <input type="text" id="f-brand" placeholder="${t('fBrandPlaceholder')}" maxlength="60" autocomplete="off">
         </div>
 
         <!-- Tipo -->
         <div class="form-group">
-          <label for="f-type">Tipo de Proteína *</label>
+          <label for="f-type">${t('fTypeLabel')}</label>
           <select id="f-type" required>
-            <option value="">Selecione...</option>
-            <option value="animal">🥩 Proteína Animal</option>
-            <option value="vegetal">🌱 Proteína Vegetal</option>
+            <option value="">${t('fTypeSelect')}</option>
+            <option value="animal">${t('fTypeAnimal')}</option>
+            <option value="vegetal">${t('fTypeVegetal')}</option>
           </select>
         </div>
 
         <!-- Moeda -->
         <div class="form-group">
-          <label for="f-currency">Moeda *</label>
+          <label for="f-currency">${t('fCurrencyLabel')}</label>
           <select id="f-currency" required>
-            <option value="BRL" selected>🇧🇷 Real Brasileiro (R$)</option>
-            <option value="USD">🇺🇸 Dólar Americano ($)</option>
-            <option value="EUR">🇪🇺 Euro (€)</option>
+            <option value="BRL" ${state.currency === 'BRL' ? 'selected' : ''}>${t('fCurrencyBRL')}</option>
+            <option value="USD" ${state.currency === 'USD' ? 'selected' : ''}>${t('fCurrencyUSD')}</option>
+            <option value="EUR" ${state.currency === 'EUR' ? 'selected' : ''}>${t('fCurrencyEUR')}</option>
           </select>
         </div>
 
         <!-- Preço -->
         <div class="form-group">
-          <label for="f-price" id="lbl-price">Preço Total (R$) *</label>
-          <input type="number" id="f-price" placeholder="Ex: 19.90" required step="0.01" min="0.01">
+          <label for="f-price" id="lbl-price">${t('fPriceLabel', { symbol })}</label>
+          <input type="number" id="f-price" placeholder="${t('fPricePlaceholder')}" required step="0.01" min="0.01">
         </div>
 
         <!-- Peso total -->
         <div class="form-group">
-          <label for="f-weight">Peso Total (g) *</label>
-          <input type="number" id="f-weight" placeholder="Ex: 500" required step="0.1" min="0.1">
+          <label for="f-weight">${t('fWeightLabel')}</label>
+          <input type="number" id="f-weight" placeholder="${t('fWeightPlaceholder')}" required step="0.1" min="0.1">
         </div>
 
         <!-- Porção -->
         <div class="form-group">
-          <label for="f-portion">Peso da Porção (g) *</label>
-          <input type="number" id="f-portion" placeholder="Ex: 100" required step="0.1" min="0.1">
+          <label for="f-portion">${t('fPortionLabel')}</label>
+          <input type="number" id="f-portion" placeholder="${t('fPortionPlaceholder')}" required step="0.1" min="0.1">
         </div>
 
         <!-- Proteína por porção -->
         <div class="form-group">
-          <label for="f-protein">Proteína na Porção (g) *</label>
-          <input type="number" id="f-protein" placeholder="Ex: 31" required step="0.1" min="0.1">
+          <label for="f-protein">${t('fProteinLabel')}</label>
+          <input type="number" id="f-protein" placeholder="${t('fProteinPlaceholder')}" required step="0.1" min="0.1">
         </div>
 
         <!-- Preview em tempo real do cálculo -->
         <div class="form-group full-width" id="calc-preview-wrapper" style="display:none">
           <div class="calc-preview">
-            <span class="calc-preview-label">💡 Preço por grama de proteína</span>
+            <span class="calc-preview-label">${t('calcPreviewLabel')}</span>
             <span class="calc-preview-value" id="calc-preview-value">—</span>
           </div>
         </div>
 
         <!-- Foto & Câmera -->
         <div class="form-group full-width">
-          <label>Foto do Produto / Tabela Nutricional <span style="color:var(--text-3);font-weight:400">(opcional)</span></label>
+          <label>${t('photoFieldLabel')} <span style="color:var(--text-3);font-weight:400">${t('photoFieldOptional')}</span></label>
           <div class="photo-upload-wrapper" id="photo-upload-area">
             <input class="photo-input" type="file" id="f-photo" accept="image/*">
-            <span class="photo-upload-label" id="photo-label">📸 Tirar foto com a câmera ou escolher da galeria</span>
+            <span class="photo-upload-label" id="photo-label">${t('photoUploadLabel')}</span>
             <img class="photo-preview-img" id="photo-preview" alt="Preview da foto">
           </div>
         </div>
 
         <!-- Localização -->
         <div class="form-group full-width">
-          <label>Local de Compra <span style="color:var(--text-3);font-weight:400">(opcional)</span></label>
+          <label>${t('locationFieldLabel')} <span style="color:var(--text-3);font-weight:400">${t('locationFieldOptional')}</span></label>
           <button type="button" class="location-btn" id="btn-add-location">
-            📍 <span id="location-text">Selecionar local no mapa</span>
+            📍 <span id="location-text">${t('locationBtnDefault')}</span>
           </button>
         </div>
 
         <!-- Ações -->
         <div class="form-actions">
           <button type="submit" class="btn-primary" id="btn-submit">
-            ${user ? '🚀 Adicionar ao Ranking Global' : '💾 Salvar no Meu Ranking'}
+            ${user ? t('btnSubmitGlobal') : t('btnSubmitLocal')}
           </button>
         </div>
 
@@ -334,23 +355,19 @@ function renderAddSection(user) {
 // ============================================================
 
 function setupFormEvents() {
-  // Preview de cálculo em tempo real
   ;['f-price', 'f-weight', 'f-portion', 'f-protein'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', updateCalcPreview)
   })
 
-  // Mudança da moeda no formulário
   document.getElementById('f-currency')?.addEventListener('change', (e) => {
     const sym = getCurrencySymbol(e.target.value)
     const lbl = document.getElementById('lbl-price')
-    if (lbl) lbl.textContent = `Preço Total (${sym}) *`
+    if (lbl) lbl.textContent = t('fPriceLabel', { symbol: sym })
     updateCalcPreview()
   })
 
-  // Upload de foto
   document.getElementById('f-photo')?.addEventListener('change', handlePhotoChange)
 
-  // Botão de localização
   document.getElementById('btn-add-location')?.addEventListener('click', () => {
     openMapModal((loc) => {
       state.location = loc
@@ -365,10 +382,7 @@ function setupFormEvents() {
     })
   })
 
-  // Fechar modal do formulário no mobile
   document.getElementById('btn-close-product-modal')?.addEventListener('click', closeProductModal)
-
-  // Submit
   document.getElementById('product-form')?.addEventListener('submit', handleFormSubmit)
 }
 
@@ -428,13 +442,12 @@ async function handleFormSubmit(e) {
   const porcao   = parseFloat(document.getElementById('f-portion')?.value)
   const proteina = parseFloat(document.getElementById('f-protein')?.value)
 
-  // Validação
   if (!name || name.length < 2) {
-    showToast('Nome do produto é obrigatório (mínimo 2 caracteres).', 'error')
+    showToast(t('valRequiredNumbers'), 'error')
     return
   }
   if (!type) {
-    showToast('Selecione o tipo de proteína.', 'error')
+    showToast(t('fTypeSelect'), 'error')
     return
   }
   const validationError = validarCampos({ preco, peso, porcao, proteina })
@@ -445,15 +458,14 @@ async function handleFormSubmit(e) {
 
   const precoPorGrama = calcularPrecoPorGrama(preco, peso, porcao, proteina)
 
-  // UI: loading state
   const btn = document.getElementById('btn-submit')
   if (btn) {
     btn.disabled = true
-    btn.textContent = '⏳ Salvando...'
+    btn.textContent = `⏳ ${t('btnSubmitting')}`
   }
 
   try {
-    // 1. USUÁRIO NÃO LOGADO: Salva no LocalStorage (Meu Ranking)
+    // 1. USUÁRIO NÃO LOGADO: Salva no LocalStorage
     if (!state.user) {
       const res = saveLocalProduct({
         name,
@@ -472,11 +484,11 @@ async function handleFormSubmit(e) {
       })
 
       if (res.duplicated) {
-        showToast('Este produto já está cadastrado no seu ranking!', 'error')
+        showToast(t('toastDuplicateLocal'), 'error')
         return
       }
 
-      showToast('Salvo no seu ranking pessoal! 🎉', 'success')
+      showToast(t('toastProductSavedLocal'), 'success')
       resetFormUI()
       state.currency = currency
       const curSelect = document.getElementById('filter-currency')
@@ -486,7 +498,7 @@ async function handleFormSubmit(e) {
       return
     }
 
-    // 2. USUÁRIO LOGADO: Salva no Supabase (Ranking Global + Nuvem)
+    // 2. USUÁRIO LOGADO: Salva no Supabase
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.user) {
       showToast('Sessão expirada. Faça login novamente.', 'error')
@@ -497,7 +509,6 @@ async function handleFormSubmit(e) {
     }
     state.user = session.user
 
-    // Comprime a foto se necessário (> 1.5MB → reduz para ~800KB JPEG)
     let photoFile = state.photoFile
     if (photoFile && photoFile.size > 1.5 * 1024 * 1024) {
       photoFile = await compressImage(photoFile)
@@ -520,15 +531,13 @@ async function handleFormSubmit(e) {
       longitude: state.location?.lng ?? null,
     })
 
-    showToast('Produto adicionado ao ranking global! 🎉', 'success')
+    showToast(t('toastProductSavedGlobal'), 'success')
     resetFormUI()
 
-    // Sincroniza a moeda ativa com a do produto recém-adicionado
     state.currency = currency
     const curSelect = document.getElementById('filter-currency')
     if (curSelect) curSelect.value = currency
 
-    // Reseta filtro de cidade para que o novo produto não fique oculto
     if (state.city !== 'all') {
       state.city = 'all'
       state.cityCoords = null
@@ -537,7 +546,6 @@ async function handleFormSubmit(e) {
       document.getElementById('btn-clear-city')?.classList.add('hidden')
     }
 
-    // Recarrega listas, mapa e estatísticas
     await Promise.all([
       loadRanking(),
       loadMyProducts(),
@@ -546,24 +554,17 @@ async function handleFormSubmit(e) {
       loadStats(state.currency),
     ])
 
-    // Scroll suave para o ranking
     setTimeout(() => {
       document.getElementById('section-ranking')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 300)
 
   } catch (err) {
     console.error('[Submit]', err)
-    const isStorageError = err.message?.includes('storage')
-    showToast(
-      isStorageError
-        ? 'Erro ao enviar foto. Tente sem a imagem.'
-        : `Erro ao salvar: ${err.message || 'Verifique sua conexão e tente novamente.'}`,
-      'error'
-    )
+    showToast(`Erro ao salvar: ${err.message || 'Verifique sua conexão.'}`, 'error')
   } finally {
     if (btn) {
       btn.disabled = false
-      btn.textContent = state.user ? '🚀 Adicionar ao Ranking Global' : '💾 Salvar no Meu Ranking'
+      btn.textContent = state.user ? t('btnSubmitGlobal') : t('btnSubmitLocal')
     }
   }
 }
@@ -582,14 +583,13 @@ function resetFormUI() {
   const locBtn  = document.getElementById('btn-add-location')
   const locText = document.getElementById('location-text')
   if (locBtn)  { locBtn.classList.remove('has-location') }
-  if (locText) { locText.textContent = 'Selecionar local no mapa' }
+  if (locText) { locText.textContent = t('locationBtnDefault') }
 
   const calcWrapper = document.getElementById('calc-preview-wrapper')
   if (calcWrapper) calcWrapper.style.display = 'none'
 
   closeProductModal()
 }
-
 
 // ============================================================
 // RANKING
@@ -599,7 +599,6 @@ async function loadRanking() {
   const container = document.getElementById('ranking-container')
   if (!container) return
 
-  // Skeleton loading
   container.innerHTML = Array.from({ length: 4 }, (_, i) => `
     <div class="loading-pulse ranking-skeleton" style="animation-delay:${i * 80}ms;margin-bottom:10px"></div>
   `).join('')
@@ -611,7 +610,6 @@ async function loadRanking() {
       city: state.city,
     })
 
-    // Se o filtro de proximidade estiver ativo, calcula a distância e filtra pelo raio
     if (state.proximityActive && state.userCoords) {
       products = products
         .map(p => {
@@ -629,8 +627,8 @@ async function loadRanking() {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">⚠️</div>
-        <div class="empty-state-title">Erro ao carregar o ranking.</div>
-        <div class="empty-state-sub">Verifique sua conexão e recarregue a página.</div>
+        <div class="empty-state-title">${t('emptyRankingTitle')}</div>
+        <div class="empty-state-sub">${t('emptyRankingSub')}</div>
       </div>`
   }
 }
@@ -648,19 +646,24 @@ async function loadMyProducts() {
 
   try {
     const products = await getMyProducts(state.user.id)
-    renderMyProductsList(container, products, async (productId, photoUrl) => {
-      await deleteProduct(productId, photoUrl)
-      showToast('Produto removido.', 'info')
-      await Promise.all([loadMyProducts(), loadRanking()])
+    renderMyProductsList(container, products, async (id, photoUrl) => {
+      try {
+        await deleteProduct(id, photoUrl)
+        showToast(t('toastDeleteSuccess'), 'info')
+        await Promise.all([loadMyProducts(), loadRanking(), loadGlobalMap(), loadStats(state.currency)])
+      } catch (err) {
+        console.error('[Delete]', err)
+        showToast(t('toastDeleteError'), 'error')
+      }
     })
   } catch (err) {
     console.error('[MyProducts]', err)
-    container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Erro ao carregar sua lista.</div></div>`
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-sub">Erro ao carregar sua lista.</div></div>`
   }
 }
 
 // ============================================================
-// STATS (hero)
+// STATS (HERO)
 // ============================================================
 
 async function loadStats(currency = state.currency) {
@@ -675,7 +678,7 @@ async function loadStats(currency = state.currency) {
       parts.push(`
         <div class="stat-item">
           <div class="stat-value">${stats.totalProducts}</div>
-          <div class="stat-label">Produtos catalogados</div>
+          <div class="stat-label">${t('heroStatTotal')}</div>
         </div>`)
     }
 
@@ -684,16 +687,15 @@ async function loadStats(currency = state.currency) {
       parts.push(`
         <div class="stat-item">
           <div class="stat-value">${sym} ${Number(stats.cheapestPricePerG).toFixed(4)}</div>
-          <div class="stat-label">Melhor preço/g proteína</div>
+          <div class="stat-label">${t('heroStatCheapest')}</div>
         </div>`)
     }
 
     el.innerHTML = parts.length > 0
       ? parts.join('')
-      : '<div class="stat-item"><div class="stat-label" style="color:var(--text-3)">Seja o primeiro a cadastrar!</div></div>'
-
-  } catch {
-    // Stats são opcionais — não bloquear a UX
+      : `<span class="stat-label">${t('heroStatNone')}</span>`
+  } catch (err) {
+    console.warn('[Stats]', err)
   }
 }
 
@@ -746,10 +748,8 @@ async function loadPersonalRanking() {
   const container = document.getElementById('my-ranking-container')
   if (!container) return
 
-  // 1. Obtém os produtos locais do LocalStorage
   const localProducts = getLocalProducts()
 
-  // Atualiza badge de contagem (desktop tabs e drawer mobile)
   const badge = document.getElementById('local-count-badge')
   const drawerBadge = document.getElementById('drawer-badge-personal')
   if (localProducts.length > 0) {
@@ -766,51 +766,31 @@ async function loadPersonalRanking() {
     drawerBadge?.classList.add('hidden')
   }
 
-  // Se o usuário estiver logado, mescla com os produtos salvos na conta dele
   let allPersonal = [...localProducts]
 
   if (state.user) {
     try {
-      const remoteProducts = await getMyProducts(state.user.id)
-      // Evita duplicar se já foi sincronizado
-      remoteProducts.forEach(remote => {
-        const alreadyIn = allPersonal.some(p =>
-          p.name.trim().toLowerCase() === remote.name.trim().toLowerCase() &&
-          Math.abs(Number(p.price) - Number(remote.price)) < 0.01
-        )
-        if (!alreadyIn) {
-          allPersonal.push({ ...remote, is_local: false })
-        }
-      })
+      const myRemote = await getMyProducts(state.user.id)
+      const formattedRemote = myRemote.map(p => ({
+        ...p,
+        is_local: false,
+      }))
+      allPersonal = [...allPersonal, ...formattedRemote]
     } catch (err) {
-      console.warn('[PersonalRanking] Erro ao carregar remotos:', err)
+      console.warn('[PersonalRanking] Erro ao buscar produtos remotos:', err)
     }
   }
 
-  // Ordena pelo menor preço por grama
   allPersonal.sort((a, b) => Number(a.price_per_g_protein) - Number(b.price_per_g_protein))
 
-  // Filtra por tipo (all, animal, vegetal)
-  if (state.filter && state.filter !== 'all') {
+  if (state.filter !== 'all') {
     allPersonal = allPersonal.filter(p => p.food_type === state.filter)
   }
 
-  // Filtra por moeda
-  if (state.currency && state.currency !== 'all') {
+  if (state.currency !== 'all') {
     allPersonal = allPersonal.filter(p => (p.currency || 'BRL').toUpperCase() === state.currency.toUpperCase())
   }
 
-  // Filtra por cidade
-  if (state.city && state.city !== 'all') {
-    const clean = cleanCityName(state.city).toLowerCase()
-    allPersonal = allPersonal.filter(p => {
-      const pCity = (p.city || '').toLowerCase()
-      const pStore = (p.store_name || '').toLowerCase()
-      return pCity.includes(clean) || pStore.includes(clean)
-    })
-  }
-
-  // Filtra por proximidade (se GPS ativo)
   if (state.proximityActive && state.userCoords) {
     allPersonal = allPersonal
       .map(p => {
@@ -823,21 +803,26 @@ async function loadPersonalRanking() {
   }
 
   renderPersonalRankingList(container, allPersonal, async (productId, photoUrl) => {
-    if (productId.startsWith('local_')) {
-      deleteLocalProduct(productId)
-      showToast('Item local removido.', 'info')
-    } else {
-      await deleteProduct(productId, photoUrl)
-      showToast('Produto removido da nuvem.', 'info')
-      await loadMyProducts()
+    try {
+      if (String(productId).startsWith('local_')) {
+        deleteLocalProduct(productId)
+        showToast(t('toastDeleteSuccess'), 'info')
+        await loadPersonalRanking()
+        checkSyncBanner()
+      } else {
+        await deleteProduct(productId, photoUrl)
+        showToast(t('toastDeleteSuccess'), 'info')
+        await Promise.all([loadPersonalRanking(), loadMyProducts(), loadRanking(), loadGlobalMap()])
+      }
+    } catch (err) {
+      console.error('[Delete Personal]', err)
+      showToast(t('toastDeleteError'), 'error')
     }
-    await Promise.all([loadPersonalRanking(), loadRanking()])
-    checkSyncBanner()
   })
 }
 
 // ============================================================
-// SINCRONIZAÇÃO LOCALSTORAGE -> SUPABASE
+// BANNER DE SINCRONIZAÇÃO
 // ============================================================
 
 function checkSyncBanner() {
@@ -846,16 +831,15 @@ function checkSyncBanner() {
 
   const localItems = getLocalProducts()
 
-  // Só exibe o banner se o usuário estiver logado e houver itens locais a sincronizar
   if (state.user && localItems.length > 0) {
     bannerContainer.innerHTML = `
       <div class="sync-banner">
         <div class="sync-banner-text">
-          🔄 Você tem <strong>${localItems.length} produto(s)</strong> no seu dispositivo. Deseja sincronizá-los com sua conta na nuvem?
+          🔄 ${t('syncBannerDesc', { count: localItems.length })}
         </div>
         <div class="sync-banner-actions">
-          <button class="btn-primary" id="btn-sync-now" style="padding:6px 14px;font-size:0.82rem">Sincronizar Agora</button>
-          <button class="btn-ghost" id="btn-sync-dismiss" style="padding:6px 12px;font-size:0.82rem">Descartar Locais</button>
+          <button class="btn-primary" id="btn-sync-now" style="padding:6px 14px;font-size:0.82rem">${t('btnSyncNow')}</button>
+          <button class="btn-ghost" id="btn-sync-dismiss" style="padding:6px 12px;font-size:0.82rem">${t('btnSyncDismiss')}</button>
         </div>
       </div>
     `
@@ -865,7 +849,7 @@ function checkSyncBanner() {
       clearLocalProducts()
       bannerContainer.innerHTML = ''
       loadPersonalRanking()
-      showToast('Produtos locais descartados.', 'info')
+      showToast(t('toastDeleteSuccess'), 'info')
     })
   } else {
     bannerContainer.innerHTML = ''
@@ -874,19 +858,17 @@ function checkSyncBanner() {
 
 async function syncLocalToSupabase() {
   const localItems = getLocalProducts()
-  if (!localItems.length || !state.user) return
+  if (!state.user || localItems.length === 0) return
 
   const syncBtn = document.getElementById('btn-sync-now')
   if (syncBtn) {
     syncBtn.disabled = true
-    syncBtn.textContent = 'Sincronizando...'
+    syncBtn.textContent = '...'
   }
 
   try {
-    let syncedCount = 0
-
-    // Pega produtos remotos existentes para aplicar regra anti-duplicidade na nuvem
     const remoteProducts = await getMyProducts(state.user.id)
+    let syncedCount = 0
 
     for (const item of localItems) {
       const isAlreadySaved = remoteProducts.some(r =>
@@ -916,17 +898,17 @@ async function syncLocalToSupabase() {
     }
 
     clearLocalProducts()
-    showToast(`${syncedCount} produto(s) sincronizado(s) com sucesso! 🎉`, 'success')
+    showToast(t('toastSyncSuccess'), 'success')
 
     document.getElementById('sync-banner-container').innerHTML = ''
     await Promise.all([loadRanking(), loadMyProducts(), loadPersonalRanking(), loadGlobalMap()])
 
   } catch (err) {
     console.error('[Sync]', err)
-    showToast('Erro ao sincronizar produtos. Tente novamente.', 'error')
+    showToast(t('toastSyncError'), 'error')
     if (syncBtn) {
       syncBtn.disabled = false
-      syncBtn.textContent = 'Sincronizar Agora'
+      syncBtn.textContent = t('btnSyncNow')
     }
   }
 }
@@ -1002,7 +984,6 @@ function setupMobileFab() {
 // ============================================================
 
 function setupFilters() {
-  // Filtros de Tipo (Todos, Animal, Vegetal)
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
@@ -1012,17 +993,14 @@ function setupFilters() {
     })
   })
 
-  // Filtro de Moeda (BRL, USD, EUR, all)
   const currencySelect = document.getElementById('filter-currency')
   currencySelect?.addEventListener('change', async (e) => {
     state.currency = e.target.value
   })
 
-  // Botão Buscar
   document.getElementById('btn-search-filters')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget
     
-    // Se o usuário digitou mas não selecionou, pegamos o valor do input
     const cityInput = document.getElementById('filter-city')?.value.trim()
     if (!cityInput) {
       state.city = 'all'
@@ -1034,7 +1012,7 @@ function setupFilters() {
 
     if (btn) {
       const originalText = btn.innerHTML
-      btn.innerHTML = '<span>⏳</span><span>Buscando...</span>'
+      btn.innerHTML = `<span>⏳</span><span>${t('btnSearch')}...</span>`
       btn.disabled = true
       
       await Promise.all([
@@ -1048,10 +1026,8 @@ function setupFilters() {
     }
   })
 
-  // Filtro de Cidade — autocomplete via Mapbox Geocoding API
   setupCityAutocomplete()
 
-  // Filtro de Proximidade (Perto de mim)
   const btnProximity = document.getElementById('btn-proximity')
   const radiusSelect = document.getElementById('filter-radius')
   const clearProximityBtn = document.getElementById('btn-clear-proximity')
@@ -1062,13 +1038,13 @@ function setupFilters() {
     }
 
     if (!navigator.geolocation) {
-      showToast('Geolocalização não é suportada pelo seu navegador.', 'error')
+      showToast(t('toastGpsDenied'), 'error')
       return
     }
 
     btnProximity.classList.add('loading')
     const textSpan = btnProximity.querySelector('.proximity-text')
-    if (textSpan) textSpan.textContent = 'Obtendo GPS...'
+    if (textSpan) textSpan.textContent = '...'
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -1080,40 +1056,37 @@ function setupFilters() {
 
         btnProximity.classList.remove('loading')
         btnProximity.classList.add('active')
-        if (textSpan) textSpan.textContent = 'Perto de mim'
+        if (textSpan) textSpan.textContent = t('btnProximity')
         radiusSelect?.classList.remove('hidden')
         clearProximityBtn?.classList.remove('hidden')
 
-        showToast(`📍 GPS ativo! Exibindo produtos até ${state.radiusKm} km.`, 'success')
+        showToast(`📍 GPS: ${state.radiusKm} km`, 'success')
         await reloadActiveRanking()
       },
       (err) => {
         btnProximity.classList.remove('loading')
-        if (textSpan) textSpan.textContent = 'Perto de mim'
+        if (textSpan) textSpan.textContent = t('btnProximity')
         console.warn('[Geolocation]', err)
-        showToast('Não foi possível obter sua localização. Permita o acesso ao GPS.', 'error')
+        showToast(t('toastGpsDenied'), 'error')
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     )
   })
 
-  // Mudança do Raio KM
   radiusSelect?.addEventListener('change', async (e) => {
     state.radiusKm = Number(e.target.value) || 25
     if (state.proximityActive) {
-      showToast(`Raio atualizado para ${state.radiusKm} km.`, 'info')
+      showToast(`Raio: ${state.radiusKm} km`, 'info')
       await reloadActiveRanking()
     }
   })
 
-  // Desativar Proximidade
   clearProximityBtn?.addEventListener('click', async () => {
     state.proximityActive = false
     state.userCoords = null
     btnProximity?.classList.remove('active')
     radiusSelect?.classList.add('hidden')
     clearProximityBtn?.classList.add('hidden')
-    showToast('Filtro por proximidade desativado.', 'info')
     await reloadActiveRanking()
   })
 }
@@ -1139,26 +1112,26 @@ function setupCityAutocomplete() {
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
   let debounceTimer = null
 
-  // Fecha sugestões ao clicar fora
   document.addEventListener('click', (e) => {
     if (!input.contains(e.target) && !suggestionsList.contains(e.target)) {
       hideSuggestions()
     }
   })
 
-  // Limpar filtro de cidade
   clearBtn?.addEventListener('click', () => {
     input.value = ''
     state.city = 'all'
     state.cityCoords = null
     clearBtn.classList.add('hidden')
     hideSuggestions()
+    reloadActiveRanking()
+    loadGlobalMap('all')
   })
 
-  input.addEventListener('input', () => {
-    const query = input.value.trim()
+  input.addEventListener('input', (e) => {
+    const query = e.target.value.trim()
+    clearTimeout(debounceTimer)
 
-    // Mostra/oculta o botão de limpar
     if (query.length > 0) {
       clearBtn?.classList.remove('hidden')
     } else {
@@ -1169,56 +1142,23 @@ function setupCityAutocomplete() {
       return
     }
 
-    // Debounce de 350ms para não spam a API
-    clearTimeout(debounceTimer)
+    if (query.length < 2 || !MAPBOX_TOKEN) {
+      hideSuggestions()
+      return
+    }
+
     debounceTimer = setTimeout(async () => {
-      if (query.length < 2) return
       try {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
-          `?types=place,locality,district&language=pt&limit=5&access_token=${MAPBOX_TOKEN}`
+        const lang = getLanguage() === 'en' ? 'en' : 'pt-BR'
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&types=place,locality&language=${lang}&limit=5`
         const res = await fetch(url)
-        if (!res.ok) throw new Error('Geocoding API error')
+        if (!res.ok) return
         const data = await res.json()
         renderSuggestions(data.features || [])
       } catch (err) {
-        console.warn('City geocoding failed:', err)
-        hideSuggestions()
+        console.warn('[CityAutocomplete]', err)
       }
-    }, 350)
-  })
-
-  input.addEventListener('keydown', (e) => {
-    const items = suggestionsList.querySelectorAll('.city-suggestion-item')
-    const active = suggestionsList.querySelector('.city-suggestion-item.active')
-    let idx = Array.from(items).indexOf(active)
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      idx = (idx + 1) % items.length
-      items.forEach(i => i.classList.remove('active'))
-      items[idx]?.classList.add('active')
-      items[idx]?.scrollIntoView({ block: 'nearest' })
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      idx = (idx - 1 + items.length) % items.length
-      items.forEach(i => i.classList.remove('active'))
-      items[idx]?.classList.add('active')
-      items[idx]?.scrollIntoView({ block: 'nearest' })
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      if (active) {
-        active.click()
-      } else {
-        const query = input.value.trim()
-        if (query) {
-          state.city = cleanCityName(query)
-          state.cityCoords = null
-          hideSuggestions()
-        }
-      }
-    } else if (e.key === 'Escape') {
-      hideSuggestions()
-    }
+    }, 280)
   })
 
   function renderSuggestions(features) {
@@ -1226,29 +1166,28 @@ function setupCityAutocomplete() {
       hideSuggestions()
       return
     }
+
     suggestionsList.innerHTML = ''
     features.forEach(feature => {
       const li = document.createElement('li')
       li.className = 'city-suggestion-item'
       li.setAttribute('role', 'option')
-      li.textContent = feature.place_name
-      li.dataset.placeName = feature.place_name
-      li.addEventListener('click', () => {
-        // Encontra o município real a partir do context ou do próprio feature se for place
-        let cityName = ''
-        if (feature.id && feature.id.startsWith('place.')) {
-          cityName = feature.text
-        } else if (feature.context) {
-          const placeCtx = feature.context.find(c => c.id.startsWith('place.') || c.id.startsWith('municipality.'))
-          cityName = placeCtx?.text || feature.text
-        } else {
-          cityName = feature.text || feature.place_name.split(',')[0].trim()
-        }
 
+      const cityName = feature.text
+      const region = feature.context?.find(c => c.id.startsWith('region.'))?.text || ''
+      const country = feature.context?.find(c => c.id.startsWith('country.'))?.text || ''
+      const subtitle = [region, country].filter(Boolean).join(', ')
+
+      li.innerHTML = `
+        <span class="city-name">${escapeHtml(cityName)}</span>
+        ${subtitle ? `<span class="city-sub">${escapeHtml(subtitle)}</span>` : ''}
+      `
+
+      li.addEventListener('click', () => {
         const clean = cleanCityName(cityName)
-        input.value = feature.place_name
+        input.value = subtitle ? `${clean} (${subtitle})` : clean
         state.city = clean
-        state.cityCoords = feature.center // [lng, lat]
+        state.cityCoords = feature.center
         hideSuggestions()
         clearBtn?.classList.remove('hidden')
       })
@@ -1268,17 +1207,30 @@ function setupCityAutocomplete() {
 // ============================================================
 
 function setupGlobalEvents() {
-  // Scroll para ranking no desktop header
   document.getElementById('btn-scroll-ranking')?.addEventListener('click', () => {
     document.getElementById('section-ranking')?.scrollIntoView({ behavior: 'smooth' })
   })
 
-  // Menu Hambúrguer (3 tracinhos no lado esquerdo)
+  // Alternador de Tema Claro / Escuro
+  document.getElementById('btn-theme-toggle')?.addEventListener('click', () => {
+    toggleTheme()
+  })
+  document.getElementById('btn-drawer-theme')?.addEventListener('click', () => {
+    toggleTheme()
+  })
+
+  // Alternador de Idioma Português / Inglês
+  document.getElementById('btn-lang-toggle')?.addEventListener('click', () => {
+    toggleLanguage()
+  })
+  document.getElementById('btn-drawer-lang')?.addEventListener('click', () => {
+    toggleLanguage()
+  })
+
+  // Menu Hambúrguer (Drawer)
   document.getElementById('btn-hamburger')?.addEventListener('click', () => {
     openDrawer()
   })
-
-  // Fechar Drawer
   document.getElementById('btn-close-drawer')?.addEventListener('click', () => {
     closeDrawer()
   })
@@ -1286,7 +1238,7 @@ function setupGlobalEvents() {
     closeDrawer()
   })
 
-  // Navegação dentro do Drawer Lateral
+  // Navegação do Drawer
   document.getElementById('drawer-nav-ranking')?.addEventListener('click', () => {
     closeDrawer()
     switchTab('global')
@@ -1306,7 +1258,6 @@ function setupGlobalEvents() {
     openProductModal()
   })
 
-  // Clicar fora do card de produto no modal mobile fecha ele
   const addSection = document.getElementById('section-add')
   addSection?.addEventListener('click', (e) => {
     if (e.target === addSection || e.target.classList.contains('modal-container-mobile')) {
@@ -1314,15 +1265,11 @@ function setupGlobalEvents() {
     }
   })
 
-  // Fechar modal do mapa
   document.getElementById('btn-close-modal')?.addEventListener('click', () => closeMapModal())
-
-  // Clicar fora do modal do mapa fecha ele
   document.getElementById('map-modal-overlay')?.addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeMapModal()
   })
 
-  // ESC fecha qualquer modal aberto ou drawer
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeMapModal()

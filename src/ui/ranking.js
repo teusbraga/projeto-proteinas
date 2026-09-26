@@ -1,5 +1,6 @@
 import { escapeHtml } from '../utils.js'
 import { getCurrencySymbol } from '../calculator.js'
+import { t } from '../i18n.js'
 
 /**
  * Renderiza o ranking público de produtos no container especificado.
@@ -14,8 +15,8 @@ export function renderRankingList(container, products) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">🥗</div>
-        <div class="empty-state-title">Nenhum produto encontrado.</div>
-        <div class="empty-state-sub">Tente alterar os filtros de cidade, distância ou moeda.</div>
+        <div class="empty-state-title">${t('emptyRankingTitle')}</div>
+        <div class="empty-state-sub">${t('emptyRankingSub')}</div>
       </div>`
     return
   }
@@ -33,7 +34,7 @@ export function renderRankingList(container, products) {
     card.style.animationDelay = `${Math.min(i * 35, 300)}ms`
 
     const badgeClass = product.food_type === 'animal' ? 'badge-animal' : 'badge-vegetal'
-    const badgeLabel = product.food_type === 'animal' ? '🥩 Animal' : '🌱 Vegetal'
+    const badgeLabel = product.food_type === 'animal' ? t('badgeAnimal') : t('badgeVegetal')
 
     const locationText = product.store_name
       ? (product.city ? `${product.store_name} (${product.city})` : product.store_name)
@@ -70,7 +71,7 @@ export function renderRankingList(container, products) {
       </div>
       <div class="rank-price">
         <div class="rank-price-value">${symbol} ${Number(product.price_per_g_protein).toFixed(4)}</div>
-        <div class="rank-price-unit">por g de proteína</div>
+        <div class="rank-price-unit">${t('perGramUnit')}</div>
       </div>
     `
     list.appendChild(card)
@@ -82,7 +83,6 @@ export function renderRankingList(container, products) {
 
 /**
  * Renderiza os produtos da aba "Meu Ranking" (Locais e/ou salvos pelo usuário).
- * Estilo visual específico: Fundo branco com borda/margem destacada na paleta laranja.
  *
  * @param {HTMLElement} container
  * @param {Array<Object>} products
@@ -95,8 +95,8 @@ export function renderPersonalRankingList(container, products, onDelete) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📝</div>
-        <div class="empty-state-title">Seu ranking pessoal ainda está vazio.</div>
-        <div class="empty-state-sub">Cadastre seus alimentos no formulário para comparar seu custo-benefício pessoal!</div>
+        <div class="empty-state-title">${t('emptyPersonalTitle')}</div>
+        <div class="empty-state-sub">${t('emptyPersonalSub')}</div>
       </div>`
     return
   }
@@ -114,7 +114,7 @@ export function renderPersonalRankingList(container, products, onDelete) {
     card.style.animationDelay = `${Math.min(i * 35, 300)}ms`
 
     const badgeClass = product.food_type === 'animal' ? 'badge-animal' : 'badge-vegetal'
-    const badgeLabel = product.food_type === 'animal' ? '🥩 Animal' : '🌱 Vegetal'
+    const badgeLabel = product.food_type === 'animal' ? t('badgeAnimal') : t('badgeVegetal')
 
     const locationText = product.store_name
       ? (product.city ? `${product.store_name} (${product.city})` : product.store_name)
@@ -125,7 +125,7 @@ export function renderPersonalRankingList(container, products, onDelete) {
       : ''
 
     const isLocalTag = product.is_local
-      ? `<span class="badge badge-local">💾 Local (não sincronizado)</span>`
+      ? `<span class="badge badge-local">💾 ${t('badgeLocal')}</span>`
       : ''
 
     const distanceHtml = product.distance_km != null
@@ -157,11 +157,11 @@ export function renderPersonalRankingList(container, products, onDelete) {
       <div class="rank-price" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <div>
           <div class="rank-price-value">${symbol} ${Number(product.price_per_g_protein).toFixed(4)}</div>
-          <div class="rank-price-unit">por g de proteína</div>
+          <div class="rank-price-unit">${t('perGramUnit')}</div>
         </div>
         ${onDelete ? `
           <button class="btn-danger btn-delete-personal" data-id="${product.id}" style="padding:3px 8px;font-size:0.75rem">
-            Remover
+            ${t('btnDelete')}
           </button>
         ` : ''}
       </div>
@@ -169,7 +169,7 @@ export function renderPersonalRankingList(container, products, onDelete) {
 
     if (onDelete) {
       card.querySelector('.btn-delete-personal')?.addEventListener('click', async (e) => {
-        const confirmed = window.confirm(`Deseja remover "${product.name}" do seu ranking?`)
+        const confirmed = window.confirm(t('confirmDelete'))
         if (!confirmed) return
         const btn = e.currentTarget
         btn.disabled = true
@@ -199,8 +199,7 @@ export function renderMyProductsList(container, products, onDelete) {
     container.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">📋</div>
-        <div class="empty-state-title">Sua lista está vazia.</div>
-        <div class="empty-state-sub">Use o formulário acima para adicionar seu primeiro produto.</div>
+        <div class="empty-state-title">${t('emptyMyProductsTitle')}</div>
       </div>`
     return
   }
@@ -231,15 +230,14 @@ export function renderMyProductsList(container, products, onDelete) {
         </div>
       </div>
       <div class="my-product-price">${symbol} ${Number(product.price_per_g_protein).toFixed(4)}/g</div>
-      <button class="btn-danger btn-remove" data-id="${product.id}" aria-label="Remover ${escapeHtml(product.name)}">
-        Remover
+      <button class="btn-danger btn-remove" data-id="${product.id}" aria-label="${t('btnDelete')} ${escapeHtml(product.name)}">
+        ${t('btnDelete')}
       </button>
     `
 
     const btnRemove = row.querySelector('.btn-remove')
     btnRemove.addEventListener('click', async () => {
-      // Confirmação para evitar exclusões acidentais no mobile/desktop
-      const confirmed = window.confirm(`Deseja realmente remover "${product.name}"?`)
+      const confirmed = window.confirm(t('confirmDelete'))
       if (!confirmed) return
 
       btnRemove.disabled = true
@@ -249,7 +247,7 @@ export function renderMyProductsList(container, products, onDelete) {
       } catch (err) {
         console.error('[Delete UI]', err)
         btnRemove.disabled = false
-        btnRemove.textContent = 'Remover'
+        btnRemove.textContent = t('btnDelete')
       }
     })
 

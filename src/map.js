@@ -1,6 +1,9 @@
 import 'mapbox-gl/dist/mapbox-gl.css'
 import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css'
 import { escapeHtml } from './utils.js'
+import { getTheme } from './theme.js'
+import { getLanguage, t } from './i18n.js'
+import { getCurrencySymbol } from './calculator.js'
 
 const TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
 
@@ -13,7 +16,7 @@ let MapboxGeocoderModule = null
 let map = null
 /** @type {any} */
 let marker = null
-/** @type {{ lat: number, lng: number, placeName: string }|null} */
+/** @type {{ lat: number, lng: number, placeName: string, city: string|null }|null} */
 let selectedLocation = null
 
 // ============================================================
@@ -24,6 +27,33 @@ let selectedLocation = null
 let globalMap = null
 /** @type {Array<any>} */
 let globalMapMarkers = []
+
+/**
+ * Retorna o estilo do Mapbox adequado ao tema atual.
+ * @returns {string}
+ */
+export function getMapboxStyle() {
+  return getTheme() === 'dark'
+    ? 'mapbox://styles/mapbox/dark-v11'
+    : 'mapbox://styles/mapbox/light-v11'
+}
+
+/**
+ * Atualiza o estilo de todos os mapas ativos na tela quando o tema muda.
+ * @param {'light'|'dark'} theme
+ */
+export function updateMapTheme(theme) {
+  const style = theme === 'dark'
+    ? 'mapbox://styles/mapbox/dark-v11'
+    : 'mapbox://styles/mapbox/light-v11'
+
+  if (globalMap) {
+    globalMap.setStyle(style)
+  }
+  if (map) {
+    map.setStyle(style)
+  }
+}
 
 /**
  * Inicializa ou atualiza o mapa global na página inicial com os últimos alfinetes.
@@ -66,7 +96,7 @@ export async function initGlobalMap(containerId, pins = [], targetCoords = null)
 
     globalMap = new mapboxgl.Map({
       container: containerId,
-      style: 'mapbox://styles/mapbox/light-v11', // Tema claro alinhado à nova paleta
+      style: getMapboxStyle(),
       center: initialCenter,
       zoom: targetCoords ? 12 : (firstValid ? 11 : 4),
       cooperativeGestures: true, // melhora scroll em celulares
@@ -105,33 +135,33 @@ export async function initGlobalMap(containerId, pins = [], targetCoords = null)
 
     const priceNum = pin.price_per_g ? Number(pin.price_per_g) : null
     const isCheapest = minPrice != null && priceNum != null && Math.abs(priceNum - minPrice) < 0.0001
+    const symbol = getCurrencySymbol(pin.currency || 'BRL')
 
     // Elemento HTML customizado para o Pin (Pílula de Preço estilo Airbnb)
     const el = document.createElement('div')
-    el.className = `map-pin-pill ${isCheapest ? 'pin-cheapest' : ''}`
-    if (isCheapest) {
-      el.style.zIndex = '50'
-    }
+    el.className = `map-pin-pill${isCheapest ? ' pin-cheapest' : ''}`
+    el.setAttribute('tabindex', '0')
+    el.setAttribute('role', 'button')
+    el.setAttribute('aria-label', `${pin.product_name}: ${symbol} ${priceNum?.toFixed(4) || '—'}`)
 
-    const priceShort = priceNum != null
-      ? `R$ ${priceNum.toFixed(4)}/g`
-      : 'Proteína'
+    const badgeContent = isCheapest
+      ? `<span class="pin-crown" title="${t('badgeCheapest', { defaultValue: 'Melhor Custo-Benefício' })}">👑</span><span class="pin-price-text">${symbol} ${priceNum.toFixed(4)}</span>`
+      : `<span class="pin-price-text">${priceNum ? `${symbol} ${priceNum.toFixed(4)}` : '—'}</span>`
 
     el.innerHTML = `
       <div class="pin-pill-content">
-        ${isCheapest ? '<span class="pin-crown" title="Menor Preço da Cidade">👑</span>' : ''}
-        <span class="pin-price-text">${priceShort}</span>
+        ${badgeContent}
       </div>
       <div class="pin-pill-tail"></div>
     `
 
     const priceFormatted = priceNum != null
-      ? `<strong>R$ ${priceNum.toFixed(4)}</strong> por grama de proteína`
+      ? `<strong>${symbol} ${priceNum.toFixed(4)}</strong> ${t('perGramUnit')}`
       : ''
 
     const popupHtml = `
       <div class="map-popup-card">
-        ${isCheapest ? '<div class="popup-badge-gold">👑 Campeão do Custo-Benefício</div>' : ''}
+        ${isCheapest ? `<div class="popup-badge-gold">👑 ${t('badgeCheapest', { defaultValue: 'Campeão do Custo-Benefício' })}</div>` : ''}
         <h4 class="popup-product-title">${escapeHtml(pin.product_name || 'Produto')}</h4>
         <p class="popup-place-name">📍 ${escapeHtml(pin.place_name || 'Local informado')}${pin.city ? ` — ${escapeHtml(pin.city)}` : ''}</p>
         ${priceFormatted ? `<div class="popup-price-tag">${priceFormatted}</div>` : ''}
@@ -167,6 +197,23 @@ export async function initGlobalMap(containerId, pins = [], targetCoords = null)
   }
 
   return globalMap
+}
+
+/**
+ * Move suavemente o mapa global para uma coordenada específica (ex: cidade buscada).
+ * @param {number} lng
+ * @param {number} lat
+ * @param {number} [zoom=12]
+ */
+export function flyGlobalMapTo(lng, lat, zoom = 12) {
+  if (globalMap) {
+    globalMap.flyTo({
+      center: [lng, lat],
+      zoom,
+      essential: true,
+      speed: 1.2
+    })
+  }
 }
 
 /** Retorna a localização selecionada atualmente (ou null). */
@@ -216,18 +263,20 @@ export async function initMap(mapContainerId, geocoderContainerId) {
 
   map = new mapboxgl.Map({
     container: mapContainerId,
-    style: 'mapbox://styles/mapbox/dark-v11',
+    style: getMapboxStyle(),
     center: [-46.6333, -23.5505], // São Paulo como padrão
     zoom: 12,
   })
+
+  const lang = getLanguage()
 
   // Geocoder (busca de endereço/estabelecimento)
   const geocoder = new MapboxGeocoder({
     accessToken: TOKEN,
     mapboxgl,
-    placeholder: 'Buscar mercado, farmácia, loja...',
-    language: 'pt-BR',
-    country: 'BR',
+    placeholder: lang === 'en' ? 'Search grocery store, pharmacy, address...' : 'Buscar mercado, farmácia, endereço...',
+    language: lang === 'en' ? 'en' : 'pt-BR',
+    country: lang === 'en' ? undefined : 'BR',
     types: 'poi,address,place,locality,neighborhood',
     trackProximity: true,
   })
@@ -303,7 +352,7 @@ function setMarker(lng, lat, placeName, city = null) {
 
   const MarkerClass = mapboxglModule?.Marker || window.mapboxgl?.Marker
   if (MarkerClass && map) {
-    marker = new MarkerClass({ color: '#22c55e', scale: 1.1 })
+    marker = new MarkerClass({ color: '#ff6b4a', scale: 1.1 })
       .setLngLat([lng, lat])
       .addTo(map)
   }
@@ -319,9 +368,10 @@ function setMarker(lng, lat, placeName, city = null) {
 
 async function reverseGeocode(lng, lat) {
   try {
+    const lang = getLanguage() === 'en' ? 'en' : 'pt-BR'
     const res = await fetch(
       `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json` +
-      `?access_token=${TOKEN}&language=pt-BR&types=poi,address,place&limit=1`
+      `?access_token=${TOKEN}&language=${lang}&types=poi,address,place&limit=1`
     )
     const json = await res.json()
     const feature = json.features?.[0]
