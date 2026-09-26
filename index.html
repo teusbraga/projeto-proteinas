@@ -180,12 +180,20 @@
             </select>
           </div>
 
-          <div class="filter-group">
+          <div class="filter-group filter-city-group">
             <label for="filter-city" class="filter-label">🏙️ Cidade:</label>
-            <select id="filter-city" class="filter-select">
-              <option value="all">Todas as Cidades</option>
-              <!-- Preenchido dinamicamente pelo JS -->
-            </select>
+            <div class="city-autocomplete-wrapper">
+              <input
+                type="text"
+                id="filter-city"
+                class="filter-input"
+                placeholder="Ex: São Paulo, SP"
+                autocomplete="off"
+                aria-label="Filtrar por cidade"
+              />
+              <button type="button" id="btn-clear-city" class="btn-clear-city hidden" title="Limpar filtro de cidade">✕</button>
+              <ul id="city-suggestions" class="city-suggestions hidden" role="listbox" aria-label="Sugestões de cidades"></ul>
+            </div>
           </div>
 
           <div class="filter-group filter-proximity-group">

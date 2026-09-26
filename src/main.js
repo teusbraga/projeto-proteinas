@@ -13,7 +13,7 @@
 import { supabase } from './supabase.js'
 import { signInWithGoogle, signOut, onAuthChange } from './auth.js'
 import { calcularPrecoPorGrama, formatarPreco, validarCampos, getCurrencySymbol } from './calculator.js'
-import { saveProduct, getMyProducts, getRanking, getLatestPins, deleteProduct, getStats, subscribeRanking, getAvailableCities } from './products.js'
+import { saveProduct, getMyProducts, getRanking, getLatestPins, deleteProduct, getStats, subscribeRanking } from './products.js'
 import { openMapModal, closeMapModal, resetMapModal } from './ui/modal.js'
 import { showToast } from './ui/toast.js'
 import { renderRankingList, renderPersonalRankingList, renderMyProductsList } from './ui/ranking.js'
@@ -997,12 +997,8 @@ function setupFilters() {
     await Promise.all([reloadActiveRanking(), loadStats(state.currency)])
   })
 
-  // Filtro de Cidade
-  const citySelect = document.getElementById('filter-city')
-  citySelect?.addEventListener('change', async (e) => {
-    state.city = e.target.value
-    await reloadActiveRanking()
-  })
+  // Filtro de Cidade — autocomplete via Mapbox Geocoding API
+  setupCityAutocomplete()
 
   // Filtro de Proximidade (Perto de mim)
   const btnProximity = document.getElementById('btn-proximity')
@@ -1082,21 +1078,122 @@ async function reloadActiveRanking() {
   }
 }
 
-async function refreshCityDropdown() {
-  const citySelect = document.getElementById('filter-city')
-  if (!citySelect) return
+// ============================================================
+// AUTOCOMPLETE DE CIDADE (Mapbox Geocoding API)
+// ============================================================
 
-  const currentVal = state.city
-  const cities = await getAvailableCities()
+function setupCityAutocomplete() {
+  const input = document.getElementById('filter-city')
+  const suggestionsList = document.getElementById('city-suggestions')
+  const clearBtn = document.getElementById('btn-clear-city')
+  if (!input || !suggestionsList) return
 
-  citySelect.innerHTML = '<option value="all">Todas as Cidades</option>'
-  cities.forEach(city => {
-    const opt = document.createElement('option')
-    opt.value = city
-    opt.textContent = city
-    if (city === currentVal) opt.selected = true
-    citySelect.appendChild(opt)
+  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN
+  let debounceTimer = null
+
+  // Fecha sugestões ao clicar fora
+  document.addEventListener('click', (e) => {
+    if (!input.contains(e.target) && !suggestionsList.contains(e.target)) {
+      hideSuggestions()
+    }
   })
+
+  // Limpar filtro de cidade
+  clearBtn?.addEventListener('click', () => {
+    input.value = ''
+    state.city = 'all'
+    clearBtn.classList.add('hidden')
+    hideSuggestions()
+    reloadActiveRanking()
+  })
+
+  input.addEventListener('input', () => {
+    const query = input.value.trim()
+
+    // Mostra/oculta o botão de limpar
+    if (query.length > 0) {
+      clearBtn?.classList.remove('hidden')
+    } else {
+      clearBtn?.classList.add('hidden')
+      state.city = 'all'
+      reloadActiveRanking()
+      hideSuggestions()
+      return
+    }
+
+    // Debounce de 350ms para não spam a API
+    clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(async () => {
+      if (query.length < 2) return
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json` +
+          `?types=place,locality,district&language=pt&limit=5&access_token=${MAPBOX_TOKEN}`
+        const res = await fetch(url)
+        if (!res.ok) throw new Error('Geocoding API error')
+        const data = await res.json()
+        renderSuggestions(data.features || [])
+      } catch (err) {
+        console.warn('City geocoding failed:', err)
+        hideSuggestions()
+      }
+    }, 350)
+  })
+
+  input.addEventListener('keydown', (e) => {
+    const items = suggestionsList.querySelectorAll('.city-suggestion-item')
+    const active = suggestionsList.querySelector('.city-suggestion-item.active')
+    let idx = Array.from(items).indexOf(active)
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      idx = (idx + 1) % items.length
+      items.forEach(i => i.classList.remove('active'))
+      items[idx]?.classList.add('active')
+      items[idx]?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      idx = (idx - 1 + items.length) % items.length
+      items.forEach(i => i.classList.remove('active'))
+      items[idx]?.classList.add('active')
+      items[idx]?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (active) active.click()
+    } else if (e.key === 'Escape') {
+      hideSuggestions()
+    }
+  })
+
+  function renderSuggestions(features) {
+    if (!features.length) {
+      hideSuggestions()
+      return
+    }
+    suggestionsList.innerHTML = ''
+    features.forEach(feature => {
+      const li = document.createElement('li')
+      li.className = 'city-suggestion-item'
+      li.setAttribute('role', 'option')
+      li.textContent = feature.place_name
+      li.dataset.placeName = feature.place_name
+      li.addEventListener('click', () => {
+        // Extrai o nome principal da cidade (antes da vírgula)
+        const cityName = feature.text || feature.place_name.split(',')[0].trim()
+        input.value = feature.place_name
+        state.city = cityName
+        hideSuggestions()
+        clearBtn?.classList.remove('hidden')
+        reloadActiveRanking()
+      })
+      suggestionsList.appendChild(li)
+    })
+    suggestionsList.classList.remove('hidden')
+  }
+
+  function hideSuggestions() {
+    suggestionsList.classList.add('hidden')
+    suggestionsList.innerHTML = ''
+  }
 }
 
 // ============================================================
