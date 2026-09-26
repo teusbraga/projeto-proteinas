@@ -478,6 +478,9 @@ async function handleFormSubmit(e) {
 
       showToast('Salvo no seu ranking pessoal! 🎉', 'success')
       resetFormUI()
+      state.currency = currency
+      const curSelect = document.getElementById('filter-currency')
+      if (curSelect) curSelect.value = currency
       switchTab('personal')
       await loadPersonalRanking()
       return
@@ -520,6 +523,20 @@ async function handleFormSubmit(e) {
     showToast('Produto adicionado ao ranking global! 🎉', 'success')
     resetFormUI()
 
+    // Sincroniza a moeda ativa com a do produto recém-adicionado
+    state.currency = currency
+    const curSelect = document.getElementById('filter-currency')
+    if (curSelect) curSelect.value = currency
+
+    // Reseta filtro de cidade para que o novo produto não fique oculto
+    if (state.city !== 'all') {
+      state.city = 'all'
+      state.cityCoords = null
+      const cityInput = document.getElementById('filter-city')
+      if (cityInput) cityInput.value = ''
+      document.getElementById('btn-clear-city')?.classList.add('hidden')
+    }
+
     // Recarrega listas, mapa e estatísticas
     await Promise.all([
       loadRanking(),
@@ -540,7 +557,7 @@ async function handleFormSubmit(e) {
     showToast(
       isStorageError
         ? 'Erro ao enviar foto. Tente sem a imagem.'
-        : 'Erro ao salvar. Verifique sua conexão e tente novamente.',
+        : `Erro ao salvar: ${err.message || 'Verifique sua conexão e tente novamente.'}`,
       'error'
     )
   } finally {

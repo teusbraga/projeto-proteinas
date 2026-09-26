@@ -61,8 +61,8 @@ export async function saveProduct({ userId, name, foodType, brand, price, weight
     portion_g:  portionG,
     protein_g:  proteinG,
     photo_url:  photoUrl,
-    store_name: storeName?.trim() || null,
-    city:       city?.trim() || null,
+    store_name: storeName?.trim() ? storeName.trim().slice(0, 120) : null,
+    city:       city?.trim() ? cleanCityName(city).slice(0, 60) : null,
     latitude:   latitude  ?? null,
     longitude:  longitude ?? null,
     currency:   (currency || 'BRL').toUpperCase(),
@@ -153,7 +153,7 @@ export async function getRanking({ foodType = null, currency = 'BRL', city = nul
     if (city && city !== 'all') {
       const clean = cleanCityName(city)
       if (clean && clean !== 'all') {
-        query = query.ilike('city', `%${clean}%`)
+        query = query.or(`city.ilike.%${clean}%,store_name.ilike.%${clean}%`)
       }
     }
 
@@ -227,7 +227,7 @@ export async function getLatestPins(limit = 100, city = null, currency = 'BRL') 
     if (city && city !== 'all') {
       const clean = cleanCityName(city)
       if (clean && clean !== 'all') {
-        query = query.ilike('city', `%${clean}%`)
+        query = query.or(`city.ilike.%${clean}%,store_name.ilike.%${clean}%`)
       }
     }
 
