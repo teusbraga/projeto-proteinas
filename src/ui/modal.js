@@ -1,4 +1,4 @@
-import { initMap, destroyMap, getSelectedLocation } from '../map.js'
+import { initMap, destroyMap, getSelectedLocation, resizeMap } from '../map.js'
 
 let mapInitialized = false
 
@@ -20,6 +20,10 @@ export function openMapModal(onConfirm) {
       initMap('map', 'geocoder-container')
       mapInitialized = true
     }, 80)
+  } else {
+    setTimeout(() => {
+      resizeMap()
+    }, 60)
   }
 
   // Trocar o listener do botão confirmar a cada abertura (evita múltiplos listeners)

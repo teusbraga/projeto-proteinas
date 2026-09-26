@@ -221,14 +221,6 @@ export async function initMap(mapContainerId, geocoderContainerId) {
     zoom: 12,
   })
 
-  // Tenta usar a geolocalização do usuário para centrar o mapa
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => map?.setCenter([coords.longitude, coords.latitude]),
-      () => {} // silencia erro de permissão negada
-    )
-  }
-
   // Geocoder (busca de endereço/estabelecimento)
   const geocoder = new MapboxGeocoder({
     accessToken: TOKEN,
@@ -236,13 +228,33 @@ export async function initMap(mapContainerId, geocoderContainerId) {
     placeholder: 'Buscar mercado, farmácia, loja...',
     language: 'pt-BR',
     country: 'BR',
-    types: 'poi,address,place',
+    types: 'poi,address,place,locality,neighborhood',
+    trackProximity: true,
   })
+
+  // Tenta usar a geolocalização do usuário para centrar o mapa e orientar a busca
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        map?.setCenter([coords.longitude, coords.latitude])
+        geocoder.setProximity({ longitude: coords.longitude, latitude: coords.latitude })
+      },
+      () => {} // silencia erro de permissão negada
+    )
+  }
 
   const geocoderEl = document.getElementById(geocoderContainerId)
   if (geocoderEl) {
     geocoderEl.appendChild(geocoder.onAdd(map))
   }
+
+  // Mantém a busca sintonizada com a região que o usuário está navegando no mapa
+  map.on('moveend', () => {
+    if (map) {
+      const center = map.getCenter()
+      geocoder.setProximity({ longitude: center.lng, latitude: center.lat })
+    }
+  })
 
   // Quando o geocoder encontra um resultado, coloca o marcador
   geocoder.on('result', (e) => {
@@ -266,6 +278,11 @@ export async function initMap(mapContainerId, geocoderContainerId) {
   })
 
   return map
+}
+
+/** Redimensiona o mapa para o container atual (corrige renderização ao reabrir modal). */
+export function resizeMap() {
+  map?.resize()
 }
 
 /** Destrói o mapa e libera recursos. Chamar ao fechar o modal. */
