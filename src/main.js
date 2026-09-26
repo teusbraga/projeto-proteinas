@@ -10,6 +10,7 @@
  * 6. Configurar modais, filtros e eventos globais
  */
 
+import { supabase } from './supabase.js'
 import { signInWithGoogle, signOut, onAuthChange } from './auth.js'
 import { calcularPrecoPorGrama, formatarPreco, validarCampos } from './calculator.js'
 import { saveProduct, getMyProducts, getRanking, deleteProduct, getStats, subscribeRanking } from './products.js'
@@ -40,6 +41,12 @@ async function init() {
   // e também processa automaticamente o callback OAuth do Google
   onAuthChange(async (user) => {
     state.user = user
+
+    // Limpa a URL poluída com #access_token=... após o Supabase capturar a sessão
+    if (window.location.hash && (window.location.hash.includes('access_token=') || window.location.hash.includes('error='))) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    }
+
     renderAuthWidget(user)
     renderAddSection(user)
 
@@ -331,6 +338,17 @@ async function handleFormSubmit(e) {
   }
 
   try {
+    // Garante que o token/sessão do Supabase está ativo antes de tentar gravar
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) {
+      showToast('Sessão expirada. Faça login novamente.', 'error')
+      state.user = null
+      renderAuthWidget(null)
+      renderAddSection(null)
+      return
+    }
+    state.user = session.user
+
     // Comprime a foto se necessário (> 1.5MB → reduz para ~800KB JPEG)
     let photoFile = state.photoFile
     if (photoFile && photoFile.size > 1.5 * 1024 * 1024) {
@@ -338,7 +356,7 @@ async function handleFormSubmit(e) {
     }
 
     await saveProduct({
-      userId:    state.user.id,
+      userId:    session.user.id,
       name,
       foodType:  type,
       brand:     brand || null,
