@@ -1815,6 +1815,64 @@ button:focus,
   background: var(--surface-2) !important;
 }
 
+/* === GEOCODER NO MODO ESCURO (Design próprio: sugestão destacada e botão X) === */
+[data-theme="dark"] #geocoder-container .suggestions {
+  border: 1px solid var(--border) !important;
+}
+
+/* 1. Item de sugestão com highlight / ativo no Modo Escuro */
+[data-theme="dark"] #geocoder-container .suggestions > .active > a,
+[data-theme="dark"] #geocoder-container .suggestions > li > a:hover {
+  background: var(--surface-3) !important;
+  background-color: var(--surface-3) !important;
+  color: var(--text) !important;
+  border-left: 3px solid var(--primary);
+  padding-left: 9px !important;
+}
+
+[data-theme="dark"] #geocoder-container .suggestions > li > a {
+  border-left: 3px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease, padding 0.15s ease;
+}
+
+[data-theme="dark"] #geocoder-container .mapboxgl-ctrl-geocoder--suggestion-title {
+  color: var(--text) !important;
+}
+
+[data-theme="dark"] #geocoder-container .mapboxgl-ctrl-geocoder--suggestion-address {
+  color: var(--text-3) !important;
+}
+
+[data-theme="dark"] #geocoder-container .suggestions > .active > a .mapboxgl-ctrl-geocoder--suggestion-title,
+[data-theme="dark"] #geocoder-container .suggestions > li > a:hover .mapboxgl-ctrl-geocoder--suggestion-title {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] #geocoder-container .suggestions > .active > a .mapboxgl-ctrl-geocoder--suggestion-address,
+[data-theme="dark"] #geocoder-container .suggestions > li > a:hover .mapboxgl-ctrl-geocoder--suggestion-address {
+  color: var(--text-2) !important;
+}
+
+/* 2. Botão X (limpar busca/sugestões da API) no Modo Escuro */
+[data-theme="dark"] #geocoder-container .mapboxgl-ctrl-geocoder--button {
+  background: transparent !important;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s ease;
+}
+
+[data-theme="dark"] #geocoder-container .mapboxgl-ctrl-geocoder--button:hover {
+  background: var(--surface-2) !important;
+}
+
+[data-theme="dark"] #geocoder-container .mapboxgl-ctrl-geocoder--icon-close {
+  fill: var(--text-2) !important;
+  transition: fill 0.15s ease;
+}
+
+[data-theme="dark"] #geocoder-container .mapboxgl-ctrl-geocoder--button:hover .mapboxgl-ctrl-geocoder--icon-close {
+  fill: var(--primary) !important;
+}
+
 /* === TOASTS === */
 #toast-container {
   position: fixed;
