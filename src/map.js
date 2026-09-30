@@ -135,17 +135,28 @@ export async function initGlobalMap(containerId, pins = [], targetCoords = null)
 
     const priceNum = pin.price_per_g ? Number(pin.price_per_g) : null
     const isCheapest = minPrice != null && priceNum != null && Math.abs(priceNum - minPrice) < 0.0001
+    const isPersonal = Boolean(pin.is_local)
     const symbol = getCurrencySymbol(pin.currency || 'BRL')
 
     // Elemento HTML customizado para o Pin (Pílula de Preço estilo Airbnb)
     const el = document.createElement('div')
-    el.className = `map-pin-pill${isCheapest ? ' pin-cheapest' : ''}`
+    const classes = ['map-pin-pill']
+    if (isCheapest) classes.push('pin-cheapest')
+    if (isPersonal) classes.push('pin-personal')
+    el.className = classes.join(' ')
     el.setAttribute('tabindex', '0')
     el.setAttribute('role', 'button')
     el.setAttribute('aria-label', `${pin.product_name}: ${symbol} ${priceNum?.toFixed(4) || '—'}`)
 
-    const badgeContent = isCheapest
-      ? `<span class="pin-crown" title="${t('badgeCheapest', { defaultValue: 'Melhor Custo-Benefício' })}">👑</span><span class="pin-price-text">${symbol} ${priceNum.toFixed(4)}</span>`
+    let badgeIcon = ''
+    if (isCheapest) {
+      badgeIcon = `<span class="pin-crown" title="${t('badgeCheapest', { defaultValue: 'Melhor Custo-Benefício' })}">👑</span>`
+    } else if (isPersonal) {
+      badgeIcon = `<span class="pin-personal-icon" title="${t('badgePersonalPin', { defaultValue: 'Meu Registro Pessoal' })}">👤</span>`
+    }
+
+    const badgeContent = badgeIcon
+      ? `${badgeIcon}<span class="pin-price-text">${symbol} ${priceNum ? priceNum.toFixed(4) : '—'}</span>`
       : `<span class="pin-price-text">${priceNum ? `${symbol} ${priceNum.toFixed(4)}` : '—'}</span>`
 
     el.innerHTML = `
@@ -162,6 +173,7 @@ export async function initGlobalMap(containerId, pins = [], targetCoords = null)
     const popupHtml = `
       <div class="map-popup-card">
         ${isCheapest ? `<div class="popup-badge-gold">👑 ${t('badgeCheapest', { defaultValue: 'Campeão do Custo-Benefício' })}</div>` : ''}
+        ${isPersonal ? `<div class="popup-badge-personal">👤 ${t('badgePersonalPin', { defaultValue: 'Meu Registro Pessoal' })}</div>` : ''}
         <h4 class="popup-product-title">${escapeHtml(pin.product_name || 'Produto')}</h4>
         <p class="popup-place-name">📍 ${escapeHtml(pin.place_name || 'Local informado')}${pin.city ? ` — ${escapeHtml(pin.city)}` : ''}</p>
         ${priceFormatted ? `<div class="popup-price-tag">${priceFormatted}</div>` : ''}

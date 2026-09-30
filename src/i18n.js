@@ -82,6 +82,9 @@ export const translations = {
     // Mapa Global
     globalMapTitle: '🗺️ Mapa Comunitário de Proteínas',
     globalMapSubtitle: 'Últimos pontos de compra cadastrados pela comunidade',
+    globalMapPersonalSubtitle: 'Pontos de compra cadastrados no seu ranking pessoal',
+    badgePersonalPin: 'Meu Registro Pessoal',
+    badgeCheapest: 'Melhor Custo-Benefício',
 
     // Ranking & Filtros
     tabGlobal: '🌍 Ranking Global',
@@ -222,6 +225,9 @@ export const translations = {
     // Mapa Global
     globalMapTitle: '🗺️ Community Protein Map',
     globalMapSubtitle: 'Recent store purchase locations shared by the community',
+    globalMapPersonalSubtitle: 'Purchase locations saved in your personal ranking',
+    badgePersonalPin: 'My Personal Entry',
+    badgeCheapest: 'Best Cost-Benefit',
 
     // Ranking & Filtros
     tabGlobal: '🌍 Global Leaderboard',

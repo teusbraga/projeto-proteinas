@@ -18,7 +18,7 @@ import { showToast } from './ui/toast.js'
 import { renderRankingList, renderPersonalRankingList, renderMyProductsList } from './ui/ranking.js'
 import { compressImage, escapeHtml, googleIcon, calculateDistanceKm, cleanCityName } from './utils.js'
 import { initGlobalMap, updateMapTheme } from './map.js'
-import { getLocalProducts, saveLocalProduct, deleteLocalProduct, clearLocalProducts } from './localRanking.js'
+import { getLocalProducts, saveLocalProduct, deleteLocalProduct, clearLocalProducts, getLocalPins } from './localRanking.js'
 import { initTheme, toggleTheme, onThemeChange } from './theme.js'
 import { initI18n, toggleLanguage, onLanguageChange, t, getLanguage } from './i18n.js'
 
@@ -491,12 +491,17 @@ async function handleFormSubmit(e) {
       }
 
       showToast(t('toastProductSavedLocal'), 'success')
+      const newCoords = (state.location?.lng != null && state.location?.lat != null)
+        ? [Number(state.location.lng), Number(state.location.lat)]
+        : null
+
       resetFormUI()
       state.currency = currency
       const curSelect = document.getElementById('filter-currency')
       if (curSelect) curSelect.value = currency
       switchTab('personal')
       await loadPersonalRanking()
+      await loadGlobalMap(state.city, newCoords)
       return
     }
 
@@ -702,13 +707,82 @@ async function loadStats(currency = state.currency) {
 }
 
 // ============================================================
-// MAPA GLOBAL (Últimos 100 pins)
+// MAPA GLOBAL & PESSOAL (Últimos 100 pins + LocalStorage)
 // ============================================================
 
 async function loadGlobalMap(city = state.city, coords = null) {
   try {
-    const pins = await getLatestPins(100, city, state.currency)
-    await initGlobalMap('global-map-container', pins, coords)
+    const isPersonalTab = state.activeTab === 'personal'
+    const localPins = getLocalPins(city, state.currency)
+
+    let finalPins = []
+
+    if (isPersonalTab) {
+      // 1. Na aba Meu Ranking: mostra exclusivamente os pontos do usuário (LocalStorage + meus produtos remotos)
+      finalPins = [...localPins]
+
+      if (state.user) {
+        try {
+          const myProducts = await getMyProducts()
+          const myPins = myProducts
+            .filter(p => p.latitude != null && p.longitude != null)
+            .filter(p => {
+              if (state.currency && state.currency !== 'all') {
+                return (p.currency || 'BRL').toUpperCase() === state.currency.toUpperCase()
+              }
+              return true
+            })
+            .map(p => ({
+              id: p.id,
+              place_name: p.store_name,
+              city: p.city,
+              latitude: Number(p.latitude),
+              longitude: Number(p.longitude),
+              product_name: p.name,
+              price_per_g: p.price_per_g_protein,
+              currency: p.currency || 'BRL',
+              created_at: p.created_at,
+              is_local: true,
+            }))
+
+          const localIds = new Set(finalPins.map(p => p.id))
+          for (const mp of myPins) {
+            if (!localIds.has(mp.id)) {
+              finalPins.push(mp)
+            }
+          }
+        } catch (err) {
+          console.warn('[PersonalMap] Erro ao carregar pins remotos do usuário:', err)
+        }
+      }
+    } else {
+      // 2. Na aba Global: combina pins remotos do Supabase com os locais (sem duplicatas)
+      let remotePins = []
+      try {
+        remotePins = await getLatestPins(100, city, state.currency)
+      } catch (err) {
+        console.warn('[GlobalMap] Supabase pausado/offline. Renderizando dados locais:', err)
+        remotePins = []
+      }
+
+      const remoteIds = new Set(remotePins.map(p => p.id))
+      const uniqueLocalPins = localPins.filter(p => !remoteIds.has(p.id))
+
+      // Pins locais aparecem junto com os da comunidade
+      finalPins = [...uniqueLocalPins, ...remotePins]
+    }
+
+    // Atualiza subtítulo do mapa contextualizado conforme a aba
+    const subtitleEl = document.querySelector('#section-global-map .section-subtitle')
+    if (subtitleEl) {
+      if (isPersonalTab) {
+        subtitleEl.textContent = t('globalMapPersonalSubtitle')
+      } else {
+        subtitleEl.textContent = t('globalMapSubtitle')
+      }
+    }
+
+    await initGlobalMap('global-map-container', finalPins, coords)
   } catch (err) {
     console.warn('[GlobalMap] Erro ao carregar pins:', err)
   }
@@ -737,12 +811,14 @@ function switchTab(tabName) {
     globalView?.classList.remove('hidden')
     personalView?.classList.add('hidden')
     loadRanking()
+    loadGlobalMap()
   } else {
     tabGlobal?.classList.remove('active')
     tabPersonal?.classList.add('active')
     globalView?.classList.add('hidden')
     personalView?.classList.remove('hidden')
     loadPersonalRanking()
+    loadGlobalMap()
   }
 }
 
@@ -809,7 +885,7 @@ async function loadPersonalRanking() {
       if (String(productId).startsWith('local_')) {
         deleteLocalProduct(productId)
         showToast(t('toastDeleteSuccess'), 'info')
-        await loadPersonalRanking()
+        await Promise.all([loadPersonalRanking(), loadGlobalMap()])
         checkSyncBanner()
       } else {
         await deleteProduct(productId, photoUrl)

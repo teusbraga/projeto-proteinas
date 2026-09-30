@@ -4,6 +4,8 @@
  * com suporte à sincronização anti-duplicidade ao conectar com Supabase.
  */
 
+import { cleanCityName } from './utils.js'
+
 const STORAGE_KEY = 'proteinprice_local_products'
 
 /**
@@ -84,4 +86,45 @@ export function deleteLocalProduct(localId) {
  */
 export function clearLocalProducts() {
   localStorage.removeItem(STORAGE_KEY)
+}
+
+/**
+ * Retorna os alfinetes geográficos dos produtos locais para exibição no mapa.
+ * @param {string|null} [city] - Filtro de cidade opcional
+ * @param {string} [currency] - Filtro de moeda opcional
+ * @returns {Array<Object>}
+ */
+export function getLocalPins(city = null, currency = 'BRL') {
+  const products = getLocalProducts()
+  return products
+    .filter(p => p.latitude != null && p.longitude != null)
+    .filter(p => {
+      if (currency && currency !== 'all') {
+        return (p.currency || 'BRL').toUpperCase() === currency.toUpperCase()
+      }
+      return true
+    })
+    .filter(p => {
+      if (city && city !== 'all') {
+        const clean = cleanCityName(city).toLowerCase()
+        if (clean && clean !== 'all') {
+          const store = (p.store_name || '').toLowerCase()
+          const c = (p.city || '').toLowerCase()
+          return store.includes(clean) || c.includes(clean)
+        }
+      }
+      return true
+    })
+    .map(p => ({
+      id: p.id,
+      place_name: p.store_name,
+      city: p.city,
+      latitude: Number(p.latitude),
+      longitude: Number(p.longitude),
+      product_name: p.name,
+      price_per_g: p.price_per_g_protein,
+      currency: p.currency || 'BRL',
+      created_at: p.created_at,
+      is_local: true,
+    }))
 }
